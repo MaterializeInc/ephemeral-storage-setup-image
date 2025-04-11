@@ -1,0 +1,1 @@
+# ephemeral-storage-setup-image
