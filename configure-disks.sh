@@ -80,10 +80,11 @@ find_aws_bottlerocket_devices() {
 }
 
 find_aws_standard_devices() {
-    lsblk --json --output-all | \
-        jq -r '.blockdevices[] | select(.model // empty | contains("Amazon EC2 NVMe Instance Storage")) | .path'
-
-    if [ $? -ne 0 ]; then
+    local lsblk_output
+    if lsblk_output=$(lsblk --json --output-all | \
+        jq -r '.blockdevices[] | select(.model // empty | contains("Amazon EC2 NVMe Instance Storage")) | .path' 2>/dev/null) && [ -n "$lsblk_output" ]; then
+        echo "$lsblk_output"
+    else
         nvme list | grep "Amazon EC2 NVMe Instance Storage" | awk '{print $1}'
     fi
 }
