@@ -243,13 +243,11 @@ EOF
 # Test AWS device detection fallback to nvme-cli
 @test "Falls back to nvme-cli for AWS device detection" {
   mock_common_commands
-  
-  # Create mock lsblk that returns empty JSON
+
   create_mock_lsblk_json '{"blockdevices": []}'
-  
-  # Make sure volume group doesn't exist yet
+
   create_mock "vgs" 1 ""  # Exit code 1 = not found
-  
+
   cat > "${MOCK_BIN}/nvme" <<EOF
 #!/bin/bash
 echo "/dev/nvme0n1  vol0123456789abcde  Amazon EC2 NVMe Instance Storage  1         0.00   B /   0.00   B  512   B 1.0"
@@ -257,16 +255,14 @@ echo "/dev/nvme1n1  vol9876543210abcde  Amazon EC2 NVMe Instance Storage  1     
 exit 0
 EOF
   chmod +x "${MOCK_BIN}/nvme"
-  
-  # Create a simpler grep that just passes through the input
+
   cat > "${MOCK_BIN}/grep" <<EOF
 #!/bin/bash
 cat
 exit 0
 EOF
   chmod +x "${MOCK_BIN}/grep"
-  
-  # Create a mock awk that directly outputs the device paths
+
   cat > "${MOCK_BIN}/awk" <<EOF
 #!/bin/bash
 echo "/dev/nvme0n1"
@@ -274,11 +270,9 @@ echo "/dev/nvme1n1"
 exit 0
 EOF
   chmod +x "${MOCK_BIN}/awk"
-  
-  # Run the script with forced AWS provider
+
   run "$SCRIPT_PATH" --cloud-provider aws
-  
-  # Check output - should find devices from nvme-cli
+
   echo "Output: $output"
   [ "$status" -eq 0 ]
   [[ "$output" == *"Found devices: /dev/nvme0n1 /dev/nvme1n1"* ]]
@@ -287,8 +281,7 @@ EOF
 # Test GCP device detection
 @test "Finds GCP local SSD devices" {
   mock_common_commands
-  
-  # Create mock find that returns GCP local SSD devices
+
   cat > "${MOCK_BIN}/find" <<EOF
 #!/bin/bash
 if [[ "\$*" == *"google-local-ssd"* ]]; then
@@ -299,11 +292,9 @@ fi
 exit 0
 EOF
   chmod +x "${MOCK_BIN}/find"
-  
-  # Run the script with forced GCP provider
+
   run "$SCRIPT_PATH" --cloud-provider gcp
-  
-  # Check output
+
   echo "Output: $output"
   [ "$status" -eq 0 ]
   [[ "$output" == *"Found devices: /dev/disk/by-id/google-local-ssd-0 /dev/disk/by-id/google-local-ssd-1"* ]]
@@ -312,8 +303,7 @@ EOF
 # Test LVM setup
 @test "Creates LVM volume group with discovered devices" {
   mock_common_commands
-  
-  # Force AWS provider and provide mock devices
+
   create_mock_lsblk_json '{
     "blockdevices": [
       {
@@ -325,11 +315,9 @@ EOF
       }
     ]
   }'
-  
-  # Run the script
+
   run "$SCRIPT_PATH" --cloud-provider aws
-  
-  # Check output
+
   echo "Output: $output"
   [ "$status" -eq 0 ]
   [[ "$output" == *"Creating physical volume on /dev/nvme0n1"* ]]
@@ -340,10 +328,8 @@ EOF
 @test "Skips LVM setup if volume group already exists" {
   mock_common_commands
 
-  # Create mock vgs that shows our volume group already exists
   create_mock "vgs" 0 "  instance-store-vg  1  2  0 wz--n- 1.00g 0"
 
-  # Force AWS provider and provide mock devices
   create_mock_lsblk_json '{
     "blockdevices": [
       {
@@ -356,10 +342,8 @@ EOF
     ]
   }'
 
-  # Run the script
   run "$SCRIPT_PATH" --cloud-provider aws
 
-  # Check output
   echo "Output: $output"
   [ "$status" -eq 0 ]
   [[ "$output" == *"Volume group instance-store-vg already exists"* ]]
@@ -367,16 +351,14 @@ EOF
 }
 
 @test "Fails if no devices are found" {
-  create_mock "vgs" 0 ""  # Empty output
+  create_mock "vgs" 0 ""
   create_mock "pvs" 0 ""
   create_mock "pvcreate" 0 "Physical volume created"
   create_mock "vgcreate" 0 "Volume group created"
   create_mock "curl" 1 "Connection failed"
 
-  # Force AWS provider but provide no devices
   create_mock_lsblk_json '{"blockdevices": []}'
 
-  # Ensure nvme-cli also finds no devices
   create_mock "nvme" 0 ""
   create_mock "grep" 0 ""
   create_mock "awk" 0 ""
@@ -393,7 +375,6 @@ EOF
   [[ "$output" == *"No suitable NVMe devices found"* ]]
 }
 
-# Test error handling
 @test "Handles unknown option error" {
   run "$SCRIPT_PATH" --invalid-option
 
