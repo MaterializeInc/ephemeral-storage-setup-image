@@ -1,0 +1,55 @@
+name: Shell Script Tests
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "**.sh"
+      - "tests/**"
+      - ".github/workflows/shell-tests.yml"
+
+jobs:
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Run ShellCheck
+        uses: ludeeus/action-shellcheck@master
+        with:
+          severity: error
+          check_together: "yes"
+          formats: sh
+
+  shell-unit-tests:
+    name: Bats Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Bats
+        uses: mig4/setup-bats@v1
+        with:
+          bats-version: 1.8.2
+
+      - name: Install Bats libraries
+        run: |
+          git clone https://github.com/bats-core/bats-support.git /tmp/bats-support
+          git clone https://github.com/bats-core/bats-assert.git /tmp/bats-assert
+          git clone https://github.com/bats-core/bats-file.git /tmp/bats-file
+
+      - name: Prepare test environment
+        run: |
+          # Create directories needed for tests with proper permissions
+          sudo mkdir -p /var/run/secrets/kubernetes.io/serviceaccount
+          sudo chmod -R 777 /var/run/secrets
+
+      - name: Run tests
+        env:
+          BATS_LIB_PATH: /tmp
+        run: |
+          chmod +x tests/run-tests.sh
+          sudo -E tests/run-tests.sh
