@@ -30,10 +30,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Setup Bats
-        uses: mig4/setup-bats@v1
-        with:
-          bats-version: 1.8.2
+      - name: Install Bats directly
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bats
+          bats --version
 
       - name: Install Bats libraries
         run: |
@@ -52,4 +53,4 @@ jobs:
           BATS_LIB_PATH: /tmp
         run: |
           chmod +x tests/run-tests.sh
-          sudo -E tests/run-tests.sh
+          sudo -E PATH=$PATH tests/run-tests.sh
