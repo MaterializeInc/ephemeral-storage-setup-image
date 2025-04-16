@@ -40,29 +40,13 @@ while [[ $# -gt 0 ]]; do
 done
 
 detect_cloud_provider() {
-    # Only attempt detection if not explicitly provided
     if [[ -n "$CLOUD_PROVIDER" ]]; then
         echo "$CLOUD_PROVIDER"
-        return
+        return 0
+    else
+        echo "ERROR: CLOUD_PROVIDER environment variable is required" >&2
+        return 1
     fi
-
-    # Check for AWS
-    if curl -s -m 5 --fail http://169.254.169.254/latest/meta-data/ >/dev/null 2>&1; then
-        echo "aws"
-        return
-    fi
-
-    # Check for GCP
-    if curl -s -m 5 --fail -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/ >/dev/null 2>&1; then
-        echo "gcp"
-        return
-    fi
-
-    # Check for Azure
-    # TODO: Implement Azure detection
-
-    # Default to generic if detection fails
-    echo "generic"
 }
 
 find_aws_bottlerocket_devices() {
@@ -80,13 +64,8 @@ find_aws_bottlerocket_devices() {
 }
 
 find_aws_standard_devices() {
-    local lsblk_output
-    if lsblk_output=$(lsblk --json --output-all | \
-        jq -r '.blockdevices[] | select(.model // empty | contains("Amazon EC2 NVMe Instance Storage")) | .path' 2>/dev/null) && [ -n "$lsblk_output" ]; then
-        echo "$lsblk_output"
-    else
-        nvme list | grep "Amazon EC2 NVMe Instance Storage" | awk '{print $1}'
-    fi
+    lsblk --json --output-all | \
+        jq -r '.blockdevices[] | select(.model // empty | contains("Amazon EC2 NVMe Instance Storage")) | .path'
 }
 
 find_aws_devices() {
@@ -186,8 +165,12 @@ setup_lvm() {
 
 echo "Starting NVMe disk configuration..."
 
-# Detect cloud provider
-CLOUD_PROVIDER=$(detect_cloud_provider)
+if ! CLOUD_PROVIDER=$(detect_cloud_provider); then
+    echo "CLOUD_PROVIDER is required. Please provide with --cloud-provider option."
+    echo "Valid options: aws, gcp, azure, generic"
+    exit 1
+fi
+
 echo "Using cloud provider: $CLOUD_PROVIDER"
 
 # Find NVMe devices

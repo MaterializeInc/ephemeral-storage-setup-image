@@ -3,10 +3,6 @@ name: Shell Script Tests
 on:
   pull_request:
     branches: [main]
-    paths:
-      - "**.sh"
-      - "tests/**"
-      - ".github/workflows/shell-tests.yml"
 
 jobs:
   shellcheck:

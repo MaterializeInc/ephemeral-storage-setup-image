@@ -13,7 +13,7 @@ This bootstrap container provides a solution for configuring local instance stor
 ```bash
 Usage: ./configure-disks.sh [options]
 Options:
-  --cloud-provider, -c PROVIDER   Specify cloud provider (aws, gcp, azure, generic)
+  --cloud-provider, -c PROVIDER  Specify cloud provider (aws, gcp, azure)
   --vg-name, -v NAME             Specify volume group name (default: instance-store-vg)
   --help, -h                     Show this help message
 ```

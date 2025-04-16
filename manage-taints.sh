@@ -33,12 +33,22 @@ fi
 remove_taint() {
     echo "Removing taint $TAINT_KEY from node $NODE_NAME"
 
-    kubectl --server="https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}" \
+    if kubectl --server="https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}" \
             --token="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" \
             --certificate-authority="/var/run/secrets/kubernetes.io/serviceaccount/ca.crt" \
-            taint nodes "$NODE_NAME" "$TAINT_KEY-" || {
-                echo "Warning: Failed to remove taint, but continuing anyway"
-            }
+            taint nodes "$NODE_NAME" "$TAINT_KEY-"; then
+        echo "Taint removed successfully"
+    else
+        if kubectl --server="https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}" \
+                --token="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" \
+                --certificate-authority="/var/run/secrets/kubernetes.io/serviceaccount/ca.crt" \
+                get node "$NODE_NAME" -o jsonpath="{.spec.taints[*].key}" | grep -q "$TAINT_KEY"; then
+            echo "Error: Failed to remove taint and it still exists on the node"
+            exit 1
+        else
+            echo "Note: Taint was already removed from the node"
+        fi
+    fi
 }
 
 # Main execution
