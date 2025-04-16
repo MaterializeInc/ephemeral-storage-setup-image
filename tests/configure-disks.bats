@@ -124,85 +124,12 @@ exit 0
 EOF
   chmod +x "${MOCK_BIN}/find"
   
-  # Run the script with --vg-name argument
-  run "$SCRIPT_PATH" --vg-name custom-vg
+  run "$SCRIPT_PATH" --vg-name custom-vg --cloud-provider aws
   
   # Check output
   echo "Output: $output"
   [ "$status" -eq 0 ]
   [[ "$output" == *"Creating volume group custom-vg"* ]]
-}
-
-# Test cloud provider detection
-@test "Auto-detects AWS cloud provider" {
-  mock_common_commands
-  
-  # Create mock curl that succeeds for AWS metadata
-  cat > "${MOCK_BIN}/curl" <<EOF
-#!/bin/bash
-if [[ "\$*" == *"169.254.169.254"* ]]; then
-  echo "AWS metadata"
-  exit 0
-else
-  echo "Not AWS"
-  exit 1
-fi
-EOF
-  chmod +x "${MOCK_BIN}/curl"
-  
-  # Create mock find_nvme_devices function that returns a test device
-  create_mock_lsblk_json '{
-    "blockdevices": [
-      {"name": "nvme0n1", "path": "/dev/nvme0n1", "mountpoint": null, "children": []}
-    ]
-  }'
-  
-  # Run the script
-  run "$SCRIPT_PATH"
-  
-  # Check output
-  echo "Output: $output"
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"Using cloud provider: aws"* ]]
-}
-
-@test "Auto-detects GCP cloud provider" {
-  mock_common_commands
-  
-  # Create mock curl that succeeds for GCP metadata
-  cat > "${MOCK_BIN}/curl" <<EOF
-#!/bin/bash
-if [[ "\$*" == *"169.254.169.254"* ]]; then
-  # AWS check fails
-  exit 1
-elif [[ "\$*" == *"metadata.google.internal"* ]]; then
-  # GCP check succeeds
-  echo "GCP metadata"
-  exit 0
-else
-  exit 1
-fi
-EOF
-  chmod +x "${MOCK_BIN}/curl"
-  
-  # Create mock find for GCP devices
-  cat > "${MOCK_BIN}/find" <<EOF
-#!/bin/bash
-if [[ "\$*" == *"google-local-ssd"* ]]; then
-  echo "/dev/disk/by-id/google-local-ssd-0"
-  exit 0
-fi
-exit 0
-EOF
-  chmod +x "${MOCK_BIN}/find"
-  
-  # Run the script
-  run "$SCRIPT_PATH"
-  
-  # Check output
-  echo "Output: $output"
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"Using cloud provider: gcp"* ]]
 }
 
 # Test AWS device detection

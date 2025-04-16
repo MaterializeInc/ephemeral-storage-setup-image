@@ -43,9 +43,9 @@ jobs:
 
       - name: Install Bats libraries
         run: |
-          git clone https://github.com/bats-core/bats-support.git /tmp/bats-support
-          git clone https://github.com/bats-core/bats-assert.git /tmp/bats-assert
-          git clone https://github.com/bats-core/bats-file.git /tmp/bats-file
+          git clone --depth 1 --branch v0.3.0 https://github.com/bats-core/bats-support.git /tmp/bats-support
+          git clone --depth 1 --branch v2.1.0 https://github.com/bats-core/bats-assert.git /tmp/bats-assert
+          git clone --depth 1 --branch v0.4.0 https://github.com/bats-core/bats-file.git /tmp/bats-file
 
       - name: Prepare test environment
         run: |
