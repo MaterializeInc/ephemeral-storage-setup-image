@@ -11,9 +11,12 @@
 
 set -euo pipefail
 
-# Node name is provided via downward API
-NODE_NAME=${NODE_NAME:-$(hostname)}
 TAINT_KEY="disk-unconfigured"
+
+if [ -z "${NODE_NAME:-}" ]; then
+    echo "Error: NODE_NAME environment variable is required but not set"
+    exit 1
+fi
 
 echo "Starting taint management for node: $NODE_NAME"
 echo "Action: $1"
@@ -33,16 +36,10 @@ fi
 remove_taint() {
     echo "Removing taint $TAINT_KEY from node $NODE_NAME"
 
-    if kubectl --server="https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}" \
-            --token="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" \
-            --certificate-authority="/var/run/secrets/kubernetes.io/serviceaccount/ca.crt" \
-            taint nodes "$NODE_NAME" "$TAINT_KEY-"; then
+    if kubectl taint nodes "$NODE_NAME" "$TAINT_KEY-"; then
         echo "Taint removed successfully"
     else
-        if kubectl --server="https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}" \
-                --token="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" \
-                --certificate-authority="/var/run/secrets/kubernetes.io/serviceaccount/ca.crt" \
-                get node "$NODE_NAME" -o jsonpath="{.spec.taints[*].key}" | grep -q "$TAINT_KEY"; then
+        if kubectl get node "$NODE_NAME" -o jsonpath="{.spec.taints[*].key}" | grep -q "$TAINT_KEY"; then
             echo "Error: Failed to remove taint and it still exists on the node"
             exit 1
         else
