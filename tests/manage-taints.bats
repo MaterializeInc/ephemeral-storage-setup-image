@@ -266,28 +266,15 @@ EOF
   [[ "$output" == *"Removing taint disk-unconfigured from node test-node"* ]]
 }
 
-@test "Uses hostname when NODE_NAME is not provided" {
+@test "Fails with error when NODE_NAME is not provided" {
   # Unset NODE_NAME
   unset NODE_NAME
-  
-  # Create mock hostname command
-  create_mock "hostname" 0 "mock-host"
-  
-  # Create mock kubectl that logs its args and succeeds
-  cat > "${MOCK_BIN}/kubectl" <<EOF
-#!/bin/bash
-echo "kubectl called with args: \$@"
-echo "node/mock-host untainted"
-exit 0
-EOF
-  chmod +x "${MOCK_BIN}/kubectl"
-  
+
   # Run the script
   run "$SCRIPT_PATH" remove
-  
-  # Check output - should use hostname
+
+  # Check output - should fail with appropriate error message
   echo "Output: $output"
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"Starting taint management for node: mock-host"* ]]
-  [[ "$output" == *"Removing taint disk-unconfigured from node mock-host"* ]]
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"Error: NODE_NAME environment variable is required but not set"* ]]
 }
