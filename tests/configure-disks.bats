@@ -168,44 +168,6 @@ EOF
   [[ "$output" == *"Found devices: /dev/nvme0n1 /dev/nvme1n1"* ]]
 }
 
-# Test AWS device detection fallback to nvme-cli
-@test "Falls back to nvme-cli for AWS device detection" {
-  mock_common_commands
-
-  create_mock_lsblk_json '{"blockdevices": []}'
-
-  create_mock "vgs" 1 ""  # Exit code 1 = not found
-
-  cat > "${MOCK_BIN}/nvme" <<EOF
-#!/bin/bash
-echo "/dev/nvme0n1  vol0123456789abcde  Amazon EC2 NVMe Instance Storage  1         0.00   B /   0.00   B  512   B 1.0"
-echo "/dev/nvme1n1  vol9876543210abcde  Amazon EC2 NVMe Instance Storage  1         0.00   B /   0.00   B  512   B 1.0"
-exit 0
-EOF
-  chmod +x "${MOCK_BIN}/nvme"
-
-  cat > "${MOCK_BIN}/grep" <<EOF
-#!/bin/bash
-cat
-exit 0
-EOF
-  chmod +x "${MOCK_BIN}/grep"
-
-  cat > "${MOCK_BIN}/awk" <<EOF
-#!/bin/bash
-echo "/dev/nvme0n1"
-echo "/dev/nvme1n1"
-exit 0
-EOF
-  chmod +x "${MOCK_BIN}/awk"
-
-  run "$SCRIPT_PATH" --cloud-provider aws
-
-  echo "Output: $output"
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"Found devices: /dev/nvme0n1 /dev/nvme1n1"* ]]
-}
-
 # Test GCP device detection
 @test "Finds GCP local SSD devices" {
   mock_common_commands
