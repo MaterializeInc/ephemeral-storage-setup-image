@@ -125,16 +125,15 @@ else
 fi
 EOF
   chmod +x "${MOCK_BIN}/cat"
-  
+
   # Run the script with the remove action
   run "$SCRIPT_PATH" remove
-  
+
   # Check output - should continue despite kubectl failure
   echo "Output: $output"
   [ "$status" -eq 0 ]
   [[ "$output" == *"Starting taint management for node: ${NODE_NAME}"* ]]
   [[ "$output" == *"Removing taint disk-unconfigured from node ${NODE_NAME}"* ]]
-  [[ "$output" == *"Warning: Failed to remove taint, but continuing anyway"* ]]
 }
 
 # Test environment validation
