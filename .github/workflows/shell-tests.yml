@@ -5,19 +5,28 @@ on:
     branches: [main]
 
 jobs:
-  shellcheck:
-    name: ShellCheck
+  lint:
+    name: Linting
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Run ShellCheck
-        uses: ludeeus/action-shellcheck@master
+      - name: Set up Python
+        uses: actions/setup-python@v4
         with:
-          severity: error
-          check_together: "yes"
-          formats: sh
+          python-version: '3.10'
+
+      - name: Install pre-commit
+        run: pip install pre-commit
+
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+      - name: Run linting
+        run: |
+          chmod +x bin/lint
+          ./bin/lint
 
   shell-unit-tests:
     name: Bats Unit Tests
@@ -40,7 +49,6 @@ jobs:
 
       - name: Prepare test environment
         run: |
-          # Create directories needed for tests with proper permissions
           sudo mkdir -p /var/run/secrets/kubernetes.io/serviceaccount
           sudo chmod -R 777 /var/run/secrets
 

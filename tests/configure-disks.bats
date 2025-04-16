@@ -5,8 +5,9 @@
 # Create a temporary directory for our test environment
 setup() {
   # Create temp directory for test artifacts
-  export TEMP_DIR="$(mktemp -d)"
-  
+  TEMP_DIR="$(mktemp -d)"
+  export TEMP_DIR
+
   # Save original path
   export ORIGINAL_PATH="$PATH"
   

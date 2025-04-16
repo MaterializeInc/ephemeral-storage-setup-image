@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+# bin/lint -- runs static analysis tools.
+#
+# SYNOPSIS
+#
+# bin/lint
+#
+# DESCRIPTION
+#
+# Runs static analysis tools, like the pyright type checker.
+
+set -euo pipefail
+
+pre-commit run --all-files --verbose
