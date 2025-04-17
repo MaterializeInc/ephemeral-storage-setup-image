@@ -21,6 +21,6 @@ RUN apk add --no-cache \
 # Disk configuration script
 COPY configure-disks.sh /usr/local/bin/configure-disks.sh
 # Taint removal script
-COPY remove-taints.sh /usr/local/bin/remove-taints.sh
+COPY remove-taint.sh /usr/local/bin/remove-taint.sh
 
-RUN chmod +x /usr/local/bin/configure-disks.sh /usr/local/bin/remove-taints.sh
+RUN chmod +x /usr/local/bin/configure-disks.sh /usr/local/bin/remove-taint.sh

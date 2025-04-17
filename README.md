@@ -136,7 +136,7 @@ resource "kubernetes_daemonset" "disk_setup" {
         init_container {
           name    = "taint-removal"
           image   = var.disk_setup_image
-          command = ["/usr/local/bin/remove-taints.sh"]
+          command = ["/usr/local/bin/remove-taint.sh"]
           resources {
             limits = {
               memory = "64Mi"

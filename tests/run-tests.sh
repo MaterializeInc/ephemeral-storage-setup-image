@@ -18,8 +18,8 @@ echo "=== Running tests for configure-disks.sh ==="
 bats "${TEST_DIR}/configure-disks.bats"
 
 echo ""
-echo "=== Running tests for remove-taints.sh ==="
-bats "${TEST_DIR}/remove-taints.bats"
+echo "=== Running tests for remove-taint.sh ==="
+bats "${TEST_DIR}/remove-taint.bats"
 
 echo ""
 echo "All tests completed!"
