@@ -132,11 +132,11 @@ resource "kubernetes_daemonset" "disk_setup" {
             mount_path = "/host"
           }
         }
-        # Taint management container
+        # Taint removal container
         init_container {
-          name    = "taint-management"
+          name    = "taint-removal"
           image   = var.disk_setup_image
-          command = ["/usr/local/bin/manage-taints.sh", "remove"]
+          command = ["/usr/local/bin/remove-taints.sh"]
           resources {
             limits = {
               memory = "64Mi"

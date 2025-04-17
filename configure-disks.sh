@@ -39,15 +39,12 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-detect_cloud_provider() {
-    if [[ -n "$CLOUD_PROVIDER" ]]; then
-        echo "$CLOUD_PROVIDER"
-        return 0
-    else
-        echo "ERROR: CLOUD_PROVIDER environment variable is required" >&2
-        return 1
-    fi
-}
+# Validate required parameters
+if [[ -z "$CLOUD_PROVIDER" ]]; then
+    echo "ERROR: Cloud provider not specified. Please provide using the --cloud-provider option."
+    echo "Valid options: aws, gcp, azure, generic"
+    exit 1
+fi
 
 find_aws_bottlerocket_devices() {
     local nvme_devices=()
@@ -164,13 +161,6 @@ setup_lvm() {
 }
 
 echo "Starting NVMe disk configuration..."
-
-if ! CLOUD_PROVIDER=$(detect_cloud_provider); then
-    echo "CLOUD_PROVIDER is required. Please provide with --cloud-provider option."
-    echo "Valid options: aws, gcp, azure, generic"
-    exit 1
-fi
-
 echo "Using cloud provider: $CLOUD_PROVIDER"
 
 # Find NVMe devices
