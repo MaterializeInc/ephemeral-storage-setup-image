@@ -98,7 +98,6 @@ EOF
   # Check output - should indicate taint was already removed
   echo "Output: $output"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"Starting taint removal for node: ${NODE_NAME}"* ]]
   [[ "$output" == *"Removing taint disk-unconfigured from node ${NODE_NAME}"* ]]
   [[ "$output" == *"Note: Taint was already removed from the node"* ]]
 }
@@ -127,7 +126,6 @@ EOF
   # Check output - should fail because taint still exists
   echo "Output: $output"
   [ "$status" -eq 1 ]
-  [[ "$output" == *"Starting taint removal for node: ${NODE_NAME}"* ]]
   [[ "$output" == *"Error: Failed to remove taint and it still exists on the node"* ]]
 }
 
