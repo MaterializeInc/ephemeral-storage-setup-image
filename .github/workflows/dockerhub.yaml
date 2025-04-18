@@ -13,7 +13,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Use QEMU for people who are into that
-        uses: docker/setup-qemu-action@v2
+        uses: docker/setup-qemu-action@v3
       - name: Use buildx for multi-platform images
         uses: docker/setup-buildx-action@v3
 
