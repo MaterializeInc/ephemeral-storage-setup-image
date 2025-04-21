@@ -235,3 +235,7 @@ resource "kubernetes_cluster_role_binding" "disk_setup" {
   }
 }
 ```
+
+## Contributing
+
+We welcome contributions! Please follow the [Contributing Guide](CONTRIBUTING.md) for details on how to contribute to this project.
