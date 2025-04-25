@@ -11,7 +11,7 @@
 
 set -euo pipefail
 
-TAINT_KEY="disk-unconfigured"
+TAINT_KEY="${TAINT_KEY:-disk-unconfigured}"
 
 if [ -z "${NODE_NAME:-}" ]; then
     echo "Error: NODE_NAME environment variable is required but not set"

@@ -94,6 +94,14 @@ find_gcp_devices() {
     echo "${ssd_devices[@]}"
 }
 
+find_azure_devices() {
+    local azure_disks=()
+
+    mapfile -t azure_disks < <(nvme list | grep "NVMe" | awk '{print $1}' || true)
+
+    echo "${azure_disks[@]}"
+}
+
 find_generic_devices() {
     lsblk --json --output-all | \
         jq -r '.blockdevices[] | select(.name | startswith("nvme")) | select(.mountpoint == null and (.children | length == 0)) | .path'
@@ -110,10 +118,9 @@ find_nvme_devices() {
         gcp)
             mapfile -t nvme_devices < <(find_gcp_devices)
             ;;
-        # TODO: Add support for Azure
-        # azure)
-        #     mapfile -t nvme_devices < <(find_azure_devices)
-        #     ;;
+        azure)
+            mapfile -t nvme_devices < <(find_azure_devices)
+            ;;
         *)
             # Generic approach for any other cloud or environment
             mapfile -t nvme_devices < <(find_generic_devices)

@@ -6,7 +6,7 @@ This bootstrap container provides a solution for configuring local instance stor
 
 - **AWS**: Detects Amazon EC2 NVMe Instance Storage devices, with special handling for Bottlerocket OS
 - **GCP**: Detects Google Cloud local SSD devices at the `/dev/disk/by-id/google-local-ssd-*` path
-- **Azure**: _To be implemented_
+- **Azure**: Detects Azure ephemeral disks at the `/dev/` path
 
 ## Usage
 
