@@ -9,9 +9,9 @@
 # the Business Source License, use of this software will be governed
 # by the Apache License, Version 2.0.
 
-set -euo pipefail
+set -xeuo pipefail
 
-TAINT_KEY="disk-unconfigured"
+TAINT_KEY="${TAINT_KEY:-disk-unconfigured}"
 
 if [ -z "${NODE_NAME:-}" ]; then
     echo "Error: NODE_NAME environment variable is required but not set"

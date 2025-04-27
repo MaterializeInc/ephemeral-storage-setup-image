@@ -68,6 +68,22 @@ EOF
   chmod +x "${MOCK_BIN}/lsblk"
 }
 
+create_mock_nvme_list_for_azure() {
+  cat > "${MOCK_BIN}/nvme" <<EOF
+#!/bin/bash
+if [[ "\$1" == "list" ]]; then
+  echo "Node             SN                   Model                                    Namespace Usage                      Format           FW Rev"
+  echo "/dev/nvme0n1     1234567890ABCDEF     Azure NVMe Disk                           1         0.00   B /   0.00   B    512   B +  0 B   1.0"
+  echo "/dev/nvme1n1     1234567890ABCDE0     Azure NVMe Disk                           1         0.00   B /   0.00   B    512   B +  0 B   1.0"
+  exit 0
+else
+  echo "Unknown nvme command"
+  exit 1
+fi
+EOF
+  chmod +x "${MOCK_BIN}/nvme"
+}
+
 # Mock other commands we don't want to actually run
 mock_common_commands() {
   # Create mock vgs that shows no existing volume groups
@@ -271,4 +287,17 @@ EOF
   echo "Output: $output"
   [ "$status" -eq 1 ]
   [[ "$output" == *"Unknown option: --invalid-option"* ]]
+}
+
+@test "Detects Azure NVMe devices via nvme list" {
+  mock_common_commands
+  create_mock_nvme_list_for_azure
+
+  run "$SCRIPT_PATH" --cloud-provider azure
+
+  echo "Output: $output"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Found devices: /dev/nvme0n1 /dev/nvme1n1"* ]]
+  [[ "$output" == *"Creating volume group instance-store-vg"* ]]
+  [[ "$output" == *"NVMe disk configuration completed successfully"* ]]
 }
