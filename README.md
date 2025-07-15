@@ -11,7 +11,7 @@ This bootstrap container provides a solution for configuring local instance stor
 ## Usage
 
 ```bash
-Usage: ./configure-disks.sh [options]
+Usage: ./configure-lvm.sh [options]
 Options:
   --cloud-provider, -c PROVIDER  Specify cloud provider (aws, gcp, azure)
   --vg-name, -v NAME             Specify volume group name (default: instance-store-vg)
@@ -22,10 +22,10 @@ Examples:
 
 ```bash
 # Specify GCP as the cloud provider
-./configure-disks.sh --cloud-provider gcp
+./configure-lvm.sh --cloud-provider gcp
 
 # Use a custom volume group name
-./configure-disks.sh --vg-name custom-vg-name -c aws
+./configure-lvm.sh --vg-name custom-vg-name -c aws
 ```
 
 ## Kubernetes Integration
@@ -99,7 +99,7 @@ resource "kubernetes_daemonset" "disk_setup" {
         init_container {
           name    = "disk-setup"
           image   = var.disk_setup_image
-          command = ["/usr/local/bin/configure-disks.sh"]
+          command = ["/usr/local/bin/configure-lvm.sh"]
           args    = ["--cloud-provider", var.cloud_provider]
           resources {
             limits = {

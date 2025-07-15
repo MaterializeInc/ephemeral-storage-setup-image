@@ -14,8 +14,8 @@ fi
 # Directory where tests are located
 TEST_DIR="$(dirname "$(readlink -f "$0")")"
 
-echo "=== Running tests for configure-disks.sh ==="
-bats "${TEST_DIR}/configure-disks.bats"
+echo "=== Running tests for configure-lvm.sh ==="
+bats "${TEST_DIR}/configure-lvm.bats"
 
 echo ""
 echo "=== Running tests for remove-taint.sh ==="

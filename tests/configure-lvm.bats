@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
 
-# Tests for configure-disks.sh script
+# Tests for configure-lvm.sh script
 
 # Create a temporary directory for our test environment
 setup() {
@@ -19,9 +19,10 @@ setup() {
   export PATH="$MOCK_BIN:$PATH"
   
   # Copy the script for testing
-  export SCRIPT_PATH="${TEMP_DIR}/configure-disks.sh"
-  cp "$(pwd)/configure-disks.sh" "$SCRIPT_PATH"
+  export SCRIPT_PATH="${TEMP_DIR}/configure-lvm.sh"
+  cp "$(pwd)/configure-lvm.sh" "${SCRIPT_PATH}"
   chmod +x "$SCRIPT_PATH"
+  cp "$(pwd)/detect-disks.sh" "${TEMP_DIR}"
   
   # Create mock data directory
   export MOCK_DATA="${TEMP_DIR}/data"
