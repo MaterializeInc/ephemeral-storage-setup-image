@@ -9,7 +9,7 @@
 # the Business Source License, use of this software will be governed
 # by the Apache License, Version 2.0.
 
-set -xeuo pipefail
+set -euo pipefail
 
 # import functions for detecting devices
 source "$(dirname "$0")/detect-disks.sh"
@@ -54,13 +54,7 @@ setup_swap() {
 
     echo "Found devices: ${devices[*]}"
 
-    # Check if volume group already exists
-    if vgs | grep -q "$VG_NAME"; then
-        echo "Volume group $VG_NAME already exists"
-        return 0
-    fi
-
-    # Create physical volumes
+    # Enable swap on each device
     for device in "${devices[@]}"; do
         if ! swapon --show=NAME --noheadings | grep -q "$device"; then
             echo "Running mkswap on $device"

@@ -24,37 +24,14 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y shellcheck
 
       - name: Run linting
-        run: |
-          chmod +x bin/lint
-          ./bin/lint
+        run: bin/lint
 
   shell-unit-tests:
-    name: Bats Unit Tests
+    name: Unit Tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Bats directly
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y bats
-          bats --version
-
-      - name: Install Bats libraries
-        run: |
-          git clone --depth 1 --branch v0.3.0 https://github.com/bats-core/bats-support.git /tmp/bats-support
-          git clone --depth 1 --branch v2.1.0 https://github.com/bats-core/bats-assert.git /tmp/bats-assert
-          git clone --depth 1 --branch v0.4.0 https://github.com/bats-core/bats-file.git /tmp/bats-file
-
-      - name: Prepare test environment
-        run: |
-          sudo mkdir -p /var/run/secrets/kubernetes.io/serviceaccount
-          sudo chmod -R 777 /var/run/secrets
-
       - name: Run tests
-        env:
-          BATS_LIB_PATH: /tmp
-        run: |
-          chmod +x tests/run-tests.sh
-          sudo -E PATH=$PATH tests/run-tests.sh
+        run: tests/run-tests.sh

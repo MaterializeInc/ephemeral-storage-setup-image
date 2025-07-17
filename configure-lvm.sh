@@ -9,7 +9,7 @@
 # the Business Source License, use of this software will be governed
 # by the Apache License, Version 2.0.
 
-set -xeuo pipefail
+set -euo pipefail
 
 # import functions for detecting devices
 source "$(dirname "$0")/detect-disks.sh"
@@ -89,11 +89,8 @@ setup_lvm() {
 echo "Starting NVMe disk configuration..."
 echo "Using cloud provider: $CLOUD_PROVIDER"
 
-# Find NVMe devices
-mapfile -t NVME_DEVICES < <(find_nvme_devices "$CLOUD_PROVIDER")
-
 # Setup LVM
-if setup_lvm "${NVME_DEVICES[@]}"; then
+if setup_lvm $(find_nvme_devices "$CLOUD_PROVIDER"); then
     echo "NVMe disk configuration completed successfully"
     exit 0
 else

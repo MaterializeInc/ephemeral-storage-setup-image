@@ -2,115 +2,158 @@
 
 # Helper functions for testing shell scripts
 
-# Create a mock command with specified behavior
-create_mock_command() {
-  local cmd_path="$1"
-  local response="$2"
-  local exit_code="${3:-0}"
-  
-  mkdir -p "$(dirname "$cmd_path")"
-  
-  cat > "$cmd_path" <<EOF
-#!/bin/bash
-echo "$response"
-exit $exit_code
-EOF
-  chmod +x "$cmd_path"
+
+# Create a temporary directory for our test environment
+setup() {
+    # Create temp directory for test artifacts
+    TEMP_DIR="$(mktemp -d)"
+    export TEMP_DIR
+
+    # Save original path
+    export ORIGINAL_PATH="$PATH"
+
+    # Create mock bin directory for our mock commands
+    export MOCK_BIN="${TEMP_DIR}/bin"
+    mkdir -p "${MOCK_BIN}"
+
+    # Add our mock bin to the front of the PATH
+    export PATH="${MOCK_BIN}:$PATH"
+
+    # Copy the script for testing
+    export LVM_SCRIPT_PATH="${MOCK_BIN}/configure-lvm.sh"
+    export SWAP_SCRIPT_PATH="${MOCK_BIN}/configure-swap.sh"
+    export REMOVE_TAINT_SCRIPT_PATH="${MOCK_BIN}/remove-taint.sh"
+    cp "$(dirname "$0")/../configure-lvm.sh" "${MOCK_BIN}/"
+    cp "$(dirname "$0")/../configure-swap.sh" "${MOCK_BIN}/"
+    cp "$(dirname "$0")/../detect-disks.sh" "${MOCK_BIN}/"
+    cp "$(dirname "$0")/../remove-taint.sh" "${MOCK_BIN}/"
+
+    # Create mock data directory
+    export MOCK_DATA="${TEMP_DIR}/data"
+    mkdir -p "$MOCK_DATA"
+
+    # Set required environment variables
+    export NODE_NAME="test-node"
 }
 
-# Create a mock command that logs its arguments
-create_logging_mock() {
-  local cmd_path="$1"
-  local response="$2"
-  local exit_code="${3:-0}"
-  local log_file="$4"
-  
-  mkdir -p "$(dirname "$cmd_path")"
-  
-  cat > "$cmd_path" <<EOF
-#!/bin/bash
-echo "\$0 called with arguments: \$@" >> "$log_file"
-echo "$response"
-exit $exit_code
-EOF
-  chmod +x "$cmd_path"
+# Clean up our test environment
+teardown() {
+    export PATH="${ORIGINAL_PATH}"
+    rm -rf "${TEMP_DIR}"
 }
 
-# Create a mock command that returns different responses based on arguments
-create_conditional_mock() {
-  local cmd_path="$1"
-  local condition_file="$2"
-  
-  mkdir -p "$(dirname "$cmd_path")"
-  
-  cat > "$cmd_path" <<EOF
-#!/bin/bash
-source "$condition_file"
-
-# Process arguments
-args="\$*"
-for condition in "\${CONDITIONS[@]}"; do
-  pattern=\$(echo "\$condition" | cut -d ':' -f 1)
-  response=\$(echo "\$condition" | cut -d ':' -f 2)
-  exit_code=\$(echo "\$condition" | cut -d ':' -f 3)
-  
-  if [[ "\$args" =~ \$pattern ]]; then
-    echo "\$response"
-    exit \$exit_code
-  fi
-done
-
-# Default behavior
-echo "\${DEFAULT_RESPONSE:-No matching condition found}"
-exit \${DEFAULT_EXIT_CODE:-1}
-EOF
-  chmod +x "$cmd_path"
+assert_equal() {
+    local output="$1"
+    local expected_output="$2"
+    if [[ "${output}" != "${expected_output}" ]]; then
+        echo "'${output}' != '${expected_output}'" >&2
+        exit 1
+    fi
 }
 
-# Create a mock lsblk command with configurable JSON output
-create_mock_lsblk() {
-  local cmd_path="$1"
-  local json_output="$2"
-  
-  mkdir -p "$(dirname "$cmd_path")"
-  
-  cat > "$cmd_path" <<EOF
+assert_output_contains() {
+    local output="$1"
+    local expected_output="$2"
+    if [[ "${output}" != *"${expected_output}"* ]]; then
+        echo "'${expected_output}' not found in '${output}'" >&2
+        exit 1
+    fi
+}
+
+assert_output_not_contains() {
+    local output="$1"
+    local expected_output="$2"
+    if [[ "${output}" == *"${expected_output}"* ]]; then
+        echo "'${expected_output}' found in '${output}' when it should not be" >&2
+        exit 1
+    fi
+}
+
+run_test() {
+    local test_func="$1"
+
+    setup
+
+    echo "Running test: ${test_func}"
+    "${test_func}"
+
+    teardown
+}
+
+run_expecting_rc() {
+    local expected_rc="$1"
+    shift 1
+
+    set +e
+    "${@}"
+    rc="$?"
+    set -e
+
+    assert_equal "${rc}" "${expected_rc}"
+}
+
+# Helper to create mock commands
+create_mock() {
+    local cmd="$1"
+    local exit_code="${2:-0}"
+    local output="$3"
+
+    cat > "${MOCK_BIN}/${cmd}" <<EOF
 #!/bin/bash
-if [[ "\$*" == *"--json"* ]]; then
-  cat <<'JSON_OUTPUT'
-$json_output
-JSON_OUTPUT
+set -euo pipefail
+echo "${output}"
+exit ${exit_code}
+EOF
+    chmod +x "${MOCK_BIN}/${cmd}"
+}
+
+create_mock_detect_disks() {
+    local rc="$1"
+    local output="$2"
+    cat > "${MOCK_BIN}/detect-disks.sh" <<EOF
+#!/bin/bash
+set -euo pipefail
+find_nvme_devices() {
+    echo "${output[@]}"
+    exit "$rc"
+}
+EOF
+    chmod +x "${MOCK_BIN}/detect-disks.sh"
+}
+
+# Helper for mock lsblk command with json output
+create_mock_lsblk_json() {
+    local json_file="${MOCK_DATA}/lsblk.json"
+    echo "$1" > "$json_file"
+
+    cat > "${MOCK_BIN}/lsblk" <<EOF
+#!/bin/bash
+set -euo pipefail
+case "\$*" in
+    *--json*)
+        cat "${json_file}"
+        ;;
+    *)
+        echo "Mock lsblk - normal output"
+    ;;
+esac
+EOF
+    chmod +x "${MOCK_BIN}/lsblk"
+}
+
+create_mock_nvme_list_for_azure() {
+    cat > "${MOCK_BIN}/nvme" <<EOF
+#!/bin/bash
+set -euo pipefail
+if [[ "\$1" == "list" ]]; then
+    echo "Node             SN                   Model                                    Namespace Usage                      Format           FW Rev"
+    echo "/dev/nvme0n1     1234567890ABCDEF     Azure NVMe Disk                           1         0.00   B /   0.00   B    512   B +  0 B   1.0"
+    echo "/dev/nvme1n1     1234567890ABCDE0     Azure NVMe Disk                           1         0.00   B /   0.00   B    512   B +  0 B   1.0"
+    exit 0
 else
-  echo "NAME MAJ:MIN RM SIZE RO TYPE MOUNTPOINT"
-  echo "nvme0n1 259:0 0 100G 0 disk"
+    echo "Unknown nvme command"
+    exit 1
 fi
-exit 0
 EOF
-  chmod +x "$cmd_path"
-}
-
-# Create a condition file for conditional mocks
-create_condition_file() {
-  local file_path="$1"
-  shift
-  local conditions=("$@")
-  
-  mkdir -p "$(dirname "$file_path")"
-  
-  cat > "$file_path" <<EOF
-#!/bin/bash
-CONDITIONS=(
-EOF
-
-  for condition in "${conditions[@]}"; do
-    echo "  \"$condition\"" >> "$file_path"
-  done
-
-  cat >> "$file_path" <<EOF
-)
-
-# Default response if no pattern matches
-DEFAULT_RESPONSE="Default response"
-DEFAULT_EXIT_CODE=0
-EOF
+    chmod +x "${MOCK_BIN}/nvme"
 }

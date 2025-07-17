@@ -15,7 +15,6 @@ RUN apk add --no-cache \
     lsblk \
     bash \
     jq \
-    curl \
     kubectl
 
 # Disk detection library functions
