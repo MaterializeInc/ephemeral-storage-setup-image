@@ -1,0 +1,74 @@
+[graph]
+targets = [
+    { triple = "aarch64-apple-darwin" },
+    { triple = "aarch64-unknown-linux-gnu" },
+    { triple = "x86_64-apple-darwin" },
+    { triple = "x86_64-unknown-linux-gnu" },
+]
+
+[advisories]
+version = 2
+ignore = []
+
+[bans]
+multiple-versions = "deny"
+skip = [
+    # Do not add to this list without good reason! Duplicate dependencies slow
+    # down compilation and bloat the binary.
+]
+
+# Use `tracing` instead.
+[[bans.deny]]
+name = "env_logger"
+
+# Use `prost` or `protobuf-native` instead.
+[[bans.deny]]
+name = "protobuf"
+
+# Use `sha1` instead, which the RustCrypto ecosystem recently took control of.
+# `sha-1` is the older and now deprecated name.
+[[bans.deny]]
+name = "sha-1"
+
+# Strum has suspect code quality and includes many unneeded features. Use
+# more targeted enum macro crates, e.g. `enum-kinds`.
+[[bans.deny]]
+name = "strum"
+[[bans.deny]]
+name = "strum-macros"
+
+# We prefer the system's native TLS or OpenSSL to Rustls, since they are more
+# mature and more widely used.
+[[bans.deny]]
+name = "rustls"
+
+# The `uncased` crate serves the same purpose as `unicase` and is more
+# actively maintained.
+[[bans.deny]]
+name = "unicase"
+
+# we don't want to pull in workspace-hack from the materialize repo, because
+# it contains a ton of dependencies that we don't want, making our builds
+# slower and flakier, and making our version bump process more complicated
+[[bans.deny]]
+name = "workspace-hack"
+
+[licenses]
+version = 2
+allow = [
+    "Apache-2.0",
+    "MIT",
+    "Unicode-3.0",
+]
+private = { ignore = true }
+
+[[licenses.clarify]]
+name = "ring"
+expression = "ISC"
+license-files = [
+    { path = "LICENSE", hash = 0xbd0eed23 }
+]
+
+[sources]
+unknown-git = "deny"
+unknown-registry = "deny"

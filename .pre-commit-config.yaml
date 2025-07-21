@@ -1,11 +1,21 @@
 default_install_hook_types:
   - pre-push
 repos:
+  - repo: https://github.com/doublify/pre-commit-rust
+    rev: v1.0
+    hooks:
+      - id: fmt
+        alias: fmt-fix
+      - id: fmt
+        alias: fmt-check
+      - id: clippy
+        args: ["--all-targets", "--all-features", "--", "--deny", "warnings"]
   - repo: local
     hooks:
-      - id: shell-lint
-        name: Shell Linting
-        entry: shellcheck
-        args: ["--external-sources", "--source-path=SCRIPTDIR"]
-        language: system
-        types: [shell]
+      - id: cargo-deny
+        name: cargo-deny
+        entry: cargo-deny
+        language: rust
+        pass_filenames: false
+        types_or: [rust, toml]
+        args: ["check", "bans", "licenses", "sources"]

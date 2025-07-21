@@ -1,6 +1,6 @@
 # Bootstrap LVM
 
-This bootstrap container provides a solution for configuring local instance store volumes on cloud instances.
+This bootstrap container provides a solution for configuring local instance store volumes on cloud instances, by either combining them into an LVM volume group or using them as swap.
 
 ## Supported Cloud Providers
 
@@ -10,22 +10,33 @@ This bootstrap container provides a solution for configuring local instance stor
 
 ## Usage
 
+### LVM
 ```bash
-Usage: ./configure-disks.sh [options]
+Usage: ephemeral-storage-setup lvm [OPTIONS] --cloud-provider <CLOUD_PROVIDER> --node-name <NODE_NAME>
+
 Options:
-  --cloud-provider, -c PROVIDER  Specify cloud provider (aws, gcp, azure)
-  --vg-name, -v NAME             Specify volume group name (default: instance-store-vg)
-  --help, -h                     Show this help message
+      --cloud-provider <CLOUD_PROVIDER>
+          [env: CLOUD_PROVIDER=] [possible values: aws, gcp, azure, generic]
+      --node-name <NODE_NAME>
+          [env: NODE_NAME=]
+      --taint-key <TAINT_KEY>
+          [env: TAINT_KEY=] [default: disk-unconfigured]
+      --vg-name <VG_NAME>
+          [env: VG_NAME=] [default: instance-store-vg]
 ```
 
-Examples:
+### Swap
 
 ```bash
-# Specify GCP as the cloud provider
-./configure-disks.sh --cloud-provider gcp
+Usage: ephemeral-storage-setup swap [OPTIONS] --cloud-provider <CLOUD_PROVIDER> --node-name <NODE_NAME>
 
-# Use a custom volume group name
-./configure-disks.sh --vg-name custom-vg-name -c aws
+Options:
+      --cloud-provider <CLOUD_PROVIDER>
+          [env: CLOUD_PROVIDER=] [possible values: aws, gcp, azure, generic]
+      --node-name <NODE_NAME>
+          [env: NODE_NAME=]
+      --taint-key <TAINT_KEY>
+          [env: TAINT_KEY=] [default: disk-unconfigured]
 ```
 
 ## Kubernetes Integration
@@ -99,8 +110,8 @@ resource "kubernetes_daemonset" "disk_setup" {
         init_container {
           name    = "disk-setup"
           image   = var.disk_setup_image
-          command = ["/usr/local/bin/configure-disks.sh"]
-          args    = ["--cloud-provider", var.cloud_provider]
+          command = ["ephemeral-storage-setup"]
+          args    = ["lvm", "--cloud-provider", var.cloud_provider]
           resources {
             limits = {
               memory = "128Mi"
@@ -130,32 +141,6 @@ resource "kubernetes_daemonset" "disk_setup" {
           volume_mount {
             name       = "host-root"
             mount_path = "/host"
-          }
-        }
-        # Taint removal container
-        init_container {
-          name    = "taint-removal"
-          image   = var.disk_setup_image
-          command = ["/usr/local/bin/remove-taint.sh"]
-          resources {
-            limits = {
-              memory = "64Mi"
-            }
-            requests = {
-              memory = "64Mi"
-              cpu    = "10m"
-            }
-          }
-          security_context {
-            run_as_user = 0
-          }
-          env {
-            name = "NODE_NAME"
-            value_from {
-              field_ref {
-                field_path = "spec.nodeName"
-              }
-            }
           }
         }
         container {

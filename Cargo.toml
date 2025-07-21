@@ -1,0 +1,22 @@
+[package]
+name = "ephemeral-storage-setup"
+version = "0.2.0"
+edition = "2024"
+rust-version = "1.88.0"
+resolver = "2"
+publish = false
+
+[[bin]]
+name = "ephemeral-storage-setup"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4.5.41", features = ["derive", "env"] }
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.140"
+
+[dev-dependencies]
+tempfile = "3.20.0"
+
+[profile.release]
+opt-level = "z"

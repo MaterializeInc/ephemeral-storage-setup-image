@@ -1,0 +1,47 @@
+name: PR
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    name: Linting
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install pre-commit
+        run: pip install pre-commit
+
+      - name: Install cargo-deny
+        run: cargo install --version "=0.18.2" --locked cargo-deny
+
+      - name: Run linting
+        run: ./bin/lint
+
+  unit-tests:
+    name: cargo test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: cargo test
+        run: cargo test
+
+  docker-build:
+    name: docker build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: docker build
+        run: docker build .

@@ -7,20 +7,23 @@
 # the Business Source License, use of this software will be governed
 # by the Apache License, Version 2.0.
 
-FROM alpine:3.21
+FROM rust:1.88.0-alpine3.22 AS builder
+RUN apk add --no-cache musl-dev
 
+WORKDIR /ephemeral-storage-setup
+COPY src ./src
+COPY Cargo.toml ./
+COPY Cargo.lock ./
+RUN cargo build --release
+
+FROM alpine:3.22 AS final
+
+# keeping bash for now just for debugging
 RUN apk add --no-cache \
-    nvme-cli \
     lvm2 \
     lsblk \
     bash \
-    jq \
-    curl \
     kubectl
 
-# Disk configuration script
-COPY configure-disks.sh /usr/local/bin/configure-disks.sh
-# Taint removal script
-COPY remove-taint.sh /usr/local/bin/remove-taint.sh
-
-RUN chmod +x /usr/local/bin/configure-disks.sh /usr/local/bin/remove-taint.sh
+COPY --from=builder /ephemeral-storage-setup/target/release/ephemeral-storage-setup /usr/local/bin/
+CMD ["ephemeral-storage-setup"]

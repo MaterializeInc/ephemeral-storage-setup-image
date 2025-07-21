@@ -1,0 +1,93 @@
+{
+  "blockdevices": [
+    {
+      "path": "/dev/nvme0n1",
+      "model": "Amazon EC2 NVMe Instance Storage",
+      "mountpoint": null,
+      "children": [],
+      "tran": "nvme",
+      "type": "disk"
+    },
+    {
+      "path": "/dev/nvme1n1",
+      "model": "Amazon EC2 NVMe Instance Storage",
+      "mountpoint": null,
+      "children": [],
+      "tran": "nvme",
+      "type": "disk"
+    },
+    {
+      "path": "/dev/nvme2n1",
+      "model": "some other model",
+      "mountpoint": null,
+      "children": [],
+      "tran": "nvme",
+      "type": "disk"
+    },
+    {
+      "path": "/dev/nvme3n1",
+      "model": "Amazon EC2 NVMe Instance Storage",
+      "mountpoint": "/",
+      "children": [],
+      "tran": "nvme",
+      "type": "disk"
+    },
+    {
+      "path": "/dev/nvme4n1",
+      "model": "Amazon EC2 NVMe Instance Storage",
+      "mountpoint": null,
+      "children": [
+        {
+          "path": "/dev/nvme4n1p1",
+          "model": "Amazon EC2 NVMe Instance Storage",
+          "mountpoint": "/home",
+          "children": [],
+          "tran": "nvme",
+          "type": "part"
+        }
+      ],
+      "tran": "nvme",
+      "type": "disk"
+    },
+    {
+      "path": "/dev/nvme5n1",
+      "model": "nvme_card",
+      "mountpoint": null,
+      "children": [],
+      "tran": "sata",
+      "type": "disk"
+    },
+    {
+      "path": "/dev/nvme6n1",
+      "model": "some other model",
+      "mountpoint": null,
+      "children": [],
+      "tran": null,
+      "type": "disk"
+    },
+    {
+      "path": "/dev/nvme7n1",
+      "model": "Amazon EC2 NVMe Instance Storage",
+      "mountpoint": null,
+      "children": null,
+      "tran": "nvme",
+      "type": "disk"
+    },
+    {
+      "path": "/dev/nvme8n1",
+      "model": "Microsoft NVMe Direct Disk v49990322",
+      "mountpoint": null,
+      "children": null,
+      "tran": "nvme",
+      "type": "disk"
+    },
+    {
+      "path": "/dev/nvme9n1",
+      "model": "nvme_card",
+      "mountpoint": null,
+      "children": null,
+      "tran": "nvme",
+      "type": "disk"
+    }
+  ]
+}
