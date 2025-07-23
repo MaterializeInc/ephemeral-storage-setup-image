@@ -198,7 +198,7 @@ resource "kubernetes_cluster_role" "disk_setup" {
   rule {
     api_groups = [""]
     resources  = ["nodes"]
-    verbs      = ["get", "patch"]
+    verbs      = ["get", "patch", "update"]
   }
 }
 

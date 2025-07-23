@@ -32,12 +32,10 @@ RUN xx-cargo build --release && \
 
 FROM alpine:3.22 AS final
 
-# keeping bash for now just for debugging
 RUN apk add --no-cache \
     lvm2 \
     lsblk \
-    bash \
-    kubectl
+    openssl
 
 COPY --from=builder /build/ephemeral-storage-setup /usr/local/bin/
 CMD ["ephemeral-storage-setup"]
