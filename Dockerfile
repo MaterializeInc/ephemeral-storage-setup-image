@@ -7,14 +7,28 @@
 # the Business Source License, use of this software will be governed
 # by the Apache License, Version 2.0.
 
-FROM rust:1.88.0-alpine3.22 AS builder
-RUN apk add --no-cache musl-dev
+FROM --platform=$BUILDPLATFORM tonistiigi/xx:1.6.1 AS xx
 
-WORKDIR /ephemeral-storage-setup
+FROM --platform=$BUILDPLATFORM rust:1.88.0-alpine3.22 AS builder
+COPY --from=xx / /
+
+ARG BUILDARCH
+ARG TARGETARCH
+ARG BUILDPLATFORM
+ARG TARGETPLATFORM
+RUN xx-apk add --no-cache xx-c-essentials && \
+    apk add --no-cache musl-dev clang perl make
+# Install target for cargo and other build tools (ie: clang)
+RUN xx-cargo --setup-target-triple
+
+WORKDIR /build
 COPY src ./src
 COPY Cargo.toml ./
 COPY Cargo.lock ./
-RUN cargo build --release
+RUN xx-cargo build --release && \
+    mv ./target/$(xx-cargo --print-target-triple)/release/ephemeral-storage-setup ./ && \
+    xx-verify --static ./ephemeral-storage-setup
+
 
 FROM alpine:3.22 AS final
 
@@ -25,5 +39,5 @@ RUN apk add --no-cache \
     bash \
     kubectl
 
-COPY --from=builder /ephemeral-storage-setup/target/release/ephemeral-storage-setup /usr/local/bin/
+COPY --from=builder /build/ephemeral-storage-setup /usr/local/bin/
 CMD ["ephemeral-storage-setup"]
