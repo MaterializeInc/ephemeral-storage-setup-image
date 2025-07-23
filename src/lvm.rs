@@ -34,7 +34,7 @@ pub struct LvmController<D: DiskDetectorTrait> {
 }
 
 impl<D: DiskDetectorTrait> LvmController<D> {
-    pub fn setup(&self) {
+    pub async fn setup(&self) {
         println!("Starting NVMe disk configuration with LVM...");
         if self.volume_group_exists() {
             println!("Volume group {} already exists.", self.vg_name);
@@ -48,7 +48,7 @@ impl<D: DiskDetectorTrait> LvmController<D> {
             self.vgcreate(&devices);
         }
         println!("LVM setup completed successfully");
-        remove_taint(self.commander.clone(), &self.node_name, &self.taint_key);
+        remove_taint(&self.node_name, &self.taint_key).await;
     }
 
     fn volume_group_exists(&self) -> bool {

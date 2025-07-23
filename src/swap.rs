@@ -9,7 +9,7 @@ pub struct SwapController<D: DiskDetectorTrait> {
     pub taint_key: String,
 }
 impl<D: DiskDetectorTrait> SwapController<D> {
-    pub fn setup(&self) {
+    pub async fn setup(&self) {
         println!("Starting NVMe disk configuration with swap...");
         let devices = self.disk_detector.detect_devices();
         for device in &devices {
@@ -24,7 +24,7 @@ impl<D: DiskDetectorTrait> SwapController<D> {
         self.sysctl("vm.min_free_kbytes", 1048576);
         self.sysctl("vm.watermark_scale_factor", 100);
         println!("Swap setup completed successfully");
-        remove_taint(self.commander.clone(), &self.node_name, &self.taint_key);
+        remove_taint(&self.node_name, &self.taint_key).await;
     }
 
     fn mkswap(&self, device: &str) {

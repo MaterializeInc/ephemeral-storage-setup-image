@@ -48,24 +48,36 @@ fn main() {
             vg_name,
         } => {
             let disk_detector = DiskDetector::new(commander.clone(), common_args.cloud_provider);
-            LvmController {
-                commander,
-                disk_detector,
-                node_name: common_args.node_name,
-                taint_key: common_args.taint_key,
-                vg_name,
-            }
-            .setup()
+            tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap()
+                .block_on(
+                    LvmController {
+                        commander,
+                        disk_detector,
+                        node_name: common_args.node_name,
+                        taint_key: common_args.taint_key,
+                        vg_name,
+                    }
+                    .setup(),
+                )
         }
         Commands::Swap { common_args } => {
             let disk_detector = DiskDetector::new(commander.clone(), common_args.cloud_provider);
-            SwapController {
-                commander,
-                disk_detector,
-                node_name: common_args.node_name,
-                taint_key: common_args.taint_key,
-            }
-            .setup()
+            tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap()
+                .block_on(
+                    SwapController {
+                        commander,
+                        disk_detector,
+                        node_name: common_args.node_name,
+                        taint_key: common_args.taint_key,
+                    }
+                    .setup(),
+                )
         }
     }
 }
