@@ -7,6 +7,9 @@ pub struct SwapController<D: DiskDetectorTrait> {
     pub disk_detector: D,
     pub node_name: String,
     pub taint_key: String,
+    pub vm_swappiness: usize,
+    pub vm_min_free_kbytes: usize,
+    pub vm_watermark_scale_factor: usize,
 }
 impl<D: DiskDetectorTrait> SwapController<D> {
     pub async fn setup(&self) {
@@ -20,9 +23,9 @@ impl<D: DiskDetectorTrait> SwapController<D> {
             }
         }
         println!("Setting sysctls to improve swap performance and safety");
-        self.sysctl("vm.swappiness", 100);
-        self.sysctl("vm.min_free_kbytes", 1048576);
-        self.sysctl("vm.watermark_scale_factor", 100);
+        self.sysctl("vm.swappiness", self.vm_swappiness);
+        self.sysctl("vm.min_free_kbytes", self.vm_min_free_kbytes);
+        self.sysctl("vm.watermark_scale_factor", self.vm_watermark_scale_factor);
         println!("Swap setup completed successfully");
         remove_taint(&self.node_name, &self.taint_key).await;
     }
