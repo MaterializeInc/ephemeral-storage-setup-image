@@ -25,12 +25,21 @@ enum Commands {
         #[clap(flatten)]
         common_args: CommonArgs,
 
+        /// Controls the weight of application data vs filesystem cache
+        /// when moving data out of memory and into swap.
+        /// 0 effectively disables swap, 100 treats them equally.
+        /// For Materialize uses, they are equivalent, so we set it to 100.
         #[arg(long, env, default_value_t = 100)]
         vm_swappiness: usize,
 
+        /// Always reserve a minimum amount of actual free RAM.
+        /// Setting this value to 1GiB makes it much less likely that we hit OOM
+        /// while we still have swap space available we could have used.
         #[arg(long, env, default_value_t = 1048576)]
         vm_min_free_kbytes: usize,
 
+        /// Increase the aggressiveness of kswapd.
+        /// Higher values will cause kswapd to swap more and earlier.
         #[arg(long, env, default_value_t = 100)]
         vm_watermark_scale_factor: usize,
     },
