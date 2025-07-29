@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::process::{Command, Output};
+use std::time::Duration;
 
 use clap::ValueEnum;
 
@@ -53,6 +54,16 @@ Stderr:
             .output()
             .expect(&failure_msg)
     }
+}
+
+pub async fn load_kube_config() -> kube::Config {
+    let mut config = kube::Config::incluster().unwrap();
+
+    config.connect_timeout = Some(Duration::from_secs(30));
+    config.read_timeout = Some(Duration::from_secs(30));
+    config.write_timeout = Some(Duration::from_secs(30));
+
+    config
 }
 
 #[cfg(test)]
