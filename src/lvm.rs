@@ -28,8 +28,9 @@ struct PvReport {
 pub struct LvmController<D: DiskDetectorTrait> {
     pub commander: Commander,
     pub disk_detector: D,
-    pub node_name: String,
+    pub node_name: Option<String>,
     pub taint_key: String,
+    pub remove_taint: bool,
     pub vg_name: String,
 }
 
@@ -48,7 +49,13 @@ impl<D: DiskDetectorTrait> LvmController<D> {
             self.vgcreate(&devices);
         }
         println!("LVM setup completed successfully");
-        remove_taint(&self.node_name, &self.taint_key).await;
+        if self.remove_taint {
+            remove_taint(
+                self.node_name.as_ref().expect("clap enforced"),
+                &self.taint_key,
+            )
+            .await;
+        }
     }
 
     fn volume_group_exists(&self) -> bool {
