@@ -21,7 +21,9 @@ jobs:
         run: pip install pre-commit
 
       - name: Install cargo-deny
-        run: cargo install --version "=0.18.2" --locked cargo-deny
+        run: >
+          curl -Ls --fail https://github.com/EmbarkStudios/cargo-deny/releases/download/0.18.3/cargo-deny-0.18.3-x86_64-unknown-linux-musl.tar.gz
+          | tar -xzC ~/.cargo/bin/ --strip-components 1 --no-anchored cargo-deny
 
       - name: Run linting
         run: ./bin/lint
