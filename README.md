@@ -154,7 +154,9 @@ resource "kubernetes_daemonset" "disk_setup" {
         }
         container {
           name  = "pause"
-          image = "gcr.io/google_containers/pause:3.2"
+          image = var.disk_setup_image
+          command = ["ephemeral-storage-setup"]
+          args    = ["sleep"]
           resources {
             limits = {
               memory = "8Mi"
