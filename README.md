@@ -12,31 +12,35 @@ This bootstrap container provides a solution for configuring local instance stor
 
 ### LVM
 ```bash
-Usage: ephemeral-storage-setup lvm [OPTIONS] --cloud-provider <CLOUD_PROVIDER> --node-name <NODE_NAME>
+Usage: ephemeral-storage-setup lvm [OPTIONS] --cloud-provider <CLOUD_PROVIDER>
 
 Options:
       --cloud-provider <CLOUD_PROVIDER>
           [env: CLOUD_PROVIDER=] [possible values: aws, gcp, azure, generic]
       --node-name <NODE_NAME>
-          [env: NODE_NAME=]
+          Name of the Kubernetes node we are running on. This is required if removing the taint [env: NODE_NAME=]
       --taint-key <TAINT_KEY>
-          [env: TAINT_KEY=] [default: disk-unconfigured]
+          Name of the taint to remove [env: TAINT_KEY=] [default: disk-unconfigured]
+      --remove-taint
+          [env: REMOVE_TAINT=]
       --vg-name <VG_NAME>
-          [env: VG_NAME=] [default: instance-store-vg]
+          Name of the LVM volume group to create [env: VG_NAME=] [default: instance-store-vg]
 ```
 
 ### Swap
 
 ```bash
-Usage: ephemeral-storage-setup swap [OPTIONS] --cloud-provider <CLOUD_PROVIDER> --node-name <NODE_NAME>
+Usage: ephemeral-storage-setup swap [OPTIONS] --cloud-provider <CLOUD_PROVIDER>
 
 Options:
       --cloud-provider <CLOUD_PROVIDER>
           [env: CLOUD_PROVIDER=] [possible values: aws, gcp, azure, generic]
       --node-name <NODE_NAME>
-          [env: NODE_NAME=]
+          Name of the Kubernetes node we are running on. This is required if removing the taint [env: NODE_NAME=]
       --taint-key <TAINT_KEY>
-          [env: TAINT_KEY=] [default: disk-unconfigured]
+          Name of the taint to remove [env: TAINT_KEY=] [default: disk-unconfigured]
+      --remove-taint
+          [env: REMOVE_TAINT=]
 ```
 
 ## Kubernetes Integration
@@ -111,7 +115,12 @@ resource "kubernetes_daemonset" "disk_setup" {
           name    = "disk-setup"
           image   = var.disk_setup_image
           command = ["ephemeral-storage-setup"]
-          args    = ["lvm", "--cloud-provider", var.cloud_provider]
+          args    = [
+            "lvm",
+            "--cloud-provider",
+            var.cloud_provider,
+            "--remove-taint",
+          ]
           resources {
             limits = {
               memory = "128Mi"

@@ -18,6 +18,7 @@ enum Commands {
         #[clap(flatten)]
         common_args: CommonArgs,
 
+        /// Name of the LVM volume group to create.
         #[arg(long, env, default_value = "instance-store-vg")]
         vg_name: String,
     },
@@ -50,11 +51,17 @@ struct CommonArgs {
     #[clap(long, env)]
     cloud_provider: CloudProvider,
 
+    /// Name of the Kubernetes node we are running on.
+    /// This is required if removing the taint.
     #[clap(long, env)]
-    node_name: String,
+    node_name: Option<String>,
 
+    /// Name of the taint to remove.
     #[clap(long, env, default_value = "disk-unconfigured")]
     taint_key: String,
+
+    #[clap(long, env, requires_if("true", "node_name"))]
+    remove_taint: bool,
 }
 
 fn main() {
@@ -62,10 +69,16 @@ fn main() {
     let commander = Commander::default();
     match args.command {
         Commands::Lvm {
-            common_args,
+            common_args:
+                CommonArgs {
+                    cloud_provider,
+                    node_name,
+                    taint_key,
+                    remove_taint,
+                },
             vg_name,
         } => {
-            let disk_detector = DiskDetector::new(commander.clone(), common_args.cloud_provider);
+            let disk_detector = DiskDetector::new(commander.clone(), cloud_provider);
             tokio::runtime::Builder::new_current_thread()
                 .enable_all()
                 .build()
@@ -74,20 +87,27 @@ fn main() {
                     LvmController {
                         commander,
                         disk_detector,
-                        node_name: common_args.node_name,
-                        taint_key: common_args.taint_key,
+                        node_name,
+                        taint_key,
+                        remove_taint,
                         vg_name,
                     }
                     .setup(),
                 )
         }
         Commands::Swap {
-            common_args,
+            common_args:
+                CommonArgs {
+                    cloud_provider,
+                    node_name,
+                    taint_key,
+                    remove_taint,
+                },
             vm_swappiness,
             vm_min_free_kbytes,
             vm_watermark_scale_factor,
         } => {
-            let disk_detector = DiskDetector::new(commander.clone(), common_args.cloud_provider);
+            let disk_detector = DiskDetector::new(commander.clone(), cloud_provider);
             tokio::runtime::Builder::new_current_thread()
                 .enable_all()
                 .build()
@@ -96,8 +116,9 @@ fn main() {
                     SwapController {
                         commander,
                         disk_detector,
-                        node_name: common_args.node_name,
-                        taint_key: common_args.taint_key,
+                        node_name,
+                        taint_key,
+                        remove_taint,
                         vm_swappiness,
                         vm_min_free_kbytes,
                         vm_watermark_scale_factor,

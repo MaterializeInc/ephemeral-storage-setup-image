@@ -5,8 +5,9 @@ use crate::remove_taint::remove_taint;
 pub struct SwapController<D: DiskDetectorTrait> {
     pub commander: Commander,
     pub disk_detector: D,
-    pub node_name: String,
+    pub node_name: Option<String>,
     pub taint_key: String,
+    pub remove_taint: bool,
     pub vm_swappiness: usize,
     pub vm_min_free_kbytes: usize,
     pub vm_watermark_scale_factor: usize,
@@ -27,7 +28,13 @@ impl<D: DiskDetectorTrait> SwapController<D> {
         self.sysctl("vm.min_free_kbytes", self.vm_min_free_kbytes);
         self.sysctl("vm.watermark_scale_factor", self.vm_watermark_scale_factor);
         println!("Swap setup completed successfully");
-        remove_taint(&self.node_name, &self.taint_key).await;
+        if self.remove_taint {
+            remove_taint(
+                self.node_name.as_ref().expect("clap enforced"),
+                &self.taint_key,
+            )
+            .await;
+        }
     }
 
     fn mkswap(&self, device: &str) {
