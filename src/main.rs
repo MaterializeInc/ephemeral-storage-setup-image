@@ -1,3 +1,6 @@
+use std::thread::sleep;
+use std::time::Duration;
+
 use clap::{Parser, Subcommand};
 
 use ephemeral_storage_setup::detect::DiskDetector;
@@ -44,6 +47,10 @@ enum Commands {
         #[arg(long, env, default_value_t = 100)]
         vm_watermark_scale_factor: usize,
     },
+    /// Don't do anything, just sleep.
+    /// This allows us to not need a separate image just to keep
+    /// the daemonset alive after we have initialized things.
+    Sleep,
 }
 
 #[derive(Parser)]
@@ -126,5 +133,8 @@ fn main() {
                     .setup(),
                 )
         }
+        Commands::Sleep => loop {
+            sleep(Duration::from_secs(3600));
+        },
     }
 }
