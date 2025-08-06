@@ -1,4 +1,4 @@
-# Bootstrap LVM
+# Bootstrap Ephemeral NVMe Drives with Swap or LVM
 
 This bootstrap container provides a solution for configuring local instance store volumes on cloud instances, by either combining them into an LVM volume group or using them as swap.
 
@@ -7,6 +7,22 @@ This bootstrap container provides a solution for configuring local instance stor
 - **AWS**: Detects Amazon EC2 NVMe Instance Storage devices, with special handling for Bottlerocket OS
 - **GCP**: Detects Google Cloud local SSD devices at the `/dev/disk/by-id/google-local-ssd-*` path
 - **Azure**: Detects Azure ephemeral disks at the `/dev/` path
+
+##### GCP note
+In GCP the `konnectivity-agent` pods are needed to retrieve any pod logs.
+If those run only on nodes with this taint and they do not tolerate it, all pod logs will be inaccessible until the taint is removed.
+In the case of failure of the ephemeral disk setup pods, it may be difficult to debug them, as their logs will be inaccessible.
+
+Configuring the `konnectivity-agent` pods to either tolerate the `disk-unconfigured` taint, or to run on nodes without that taint will allow logs to be accessible as normal. A separate pool of nodes for system daemons without ephemeral disks should work fine.
+
+##### Azure note
+Azure AKS nodes do not support removing taints.
+The issue for fixing this was closed (https://github.com/Azure/AKS/issues/2934), so it is unlikely Microsoft will support this any time soon.
+As such, you should not pass the `--remove-taint` argument to the ephemeral disk setup pods, and should not configure your nodes to start with the `disk-unconfigured` taint.
+During the time between the node launching and the ephemeral volumes being configured, workloads that rely on those volumes may fail.
+This is a sad state of affairs for Azure Kubernetes, and we recommend that you contact your Azure support representative to encourage them to fix this.
+
+There is a work around possible by using an admission controller to apply the taint when the node is created, rather than configuring it using AKS. This is unfortunately out of the scope of this tool for now.
 
 ## Usage
 
@@ -54,7 +70,11 @@ This solution is designed to be deployed as a Kubernetes DaemonSet to automatica
 3. Once disks are configured, the node taint `disk-unconfigured` is removed
 4. Pods can then be scheduled on the node
 
-### Terraform Example
+It is recommended that any daemonsets required for networking or logs run on other nodes, or be configured to tolerate this taint.
+
+### Terraform Example (swap)
+
+The example below is for configuring disks as swap space. If you would like to use the disks as an LVM volume group, simply replace the `swap` argument with `lvm`.
 
 ```hcl
 resource "kubernetes_daemonset" "disk_setup" {
@@ -116,7 +136,7 @@ resource "kubernetes_daemonset" "disk_setup" {
           image   = var.disk_setup_image
           command = ["ephemeral-storage-setup"]
           args    = [
-            "lvm",
+            "swap",
             "--cloud-provider",
             var.cloud_provider,
             "--remove-taint",
