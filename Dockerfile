@@ -37,5 +37,6 @@ RUN apk add --no-cache \
     lsblk \
     openssl
 
+COPY lvm.conf /etc/lvm/lvm.conf
 COPY --from=builder /build/ephemeral-storage-setup /usr/local/bin/
 CMD ["ephemeral-storage-setup"]

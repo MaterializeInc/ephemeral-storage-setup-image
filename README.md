@@ -8,6 +8,32 @@ This bootstrap container provides a solution for configuring local instance stor
 - **GCP**: Detects Google Cloud local SSD devices at the `/dev/disk/by-id/google-local-ssd-*` path
 - **Azure**: Detects Azure ephemeral disks at the `/dev/` path
 
+##### AWS Bottlerocket note
+Bottlerocket supports bootstrap containers which can be used to configure disks before the node ever gets marked as ready.
+This is superior to the daemonset method required for other cloud providers, as you don't need to apply and remove taints,
+nor are you left with a daemonset running on your node after it has configured the disks.
+
+Unfortunately, Bottlerocket does not allow directly passing args to bootstrap containers.
+In order to configure the ephemeral-storage-setup container, you must supply the args in a base64-encoded json array set in the bootstrap container's user-data field.
+For example, `["swap", "--cloud-provider", "aws"]\n` in base64 would be `WyJzd2FwIiwgIi0tY2xvdWQtcHJvdmlkZXIiLCAiYXdzIl0K`.
+
+Bottlerocket also does not allow modifying sysctl settings within bootstrap containers.
+These changes must be provided in the Bottlerocket configuration instead.
+
+For example, to configure Bottlerocket for swap:
+```toml
+[settings.bootstrap-containers.diskstrap]
+source = "docker.io/materialize/ephemeral-storage-setup-image:v0.3.0"
+mode = "always"
+essential = true
+user-data = "WyJzd2FwIiwgIi0tY2xvdWQtcHJvdmlkZXIiLCAiYXdzIl0K"
+
+[settings.kernel.sysctl]
+"vm.swappiness" = "100"
+"vm.min_free_kbytes" = "1048576"
+"vm.watermark_scale_factor" = "100"
+```
+
 ##### GCP note
 In GCP the `konnectivity-agent` pods are needed to retrieve any pod logs.
 If those run only on nodes with this taint and they do not tolerate it, all pod logs will be inaccessible until the taint is removed.
@@ -57,6 +83,14 @@ Options:
           Name of the taint to remove [env: TAINT_KEY=] [default: disk-unconfigured]
       --remove-taint
           [env: REMOVE_TAINT=]
+      --apply-sysctls
+          Apply sysctl settings to make swap more effective and safer [env: APPLY_SYSCTLS=]
+      --vm-swappiness <VM_SWAPPINESS>
+          Controls the weight of application data vs filesystem cache when moving data out of memory and into swap. 0 effectively disables swap, 100 treats them equally. For Materialize uses, they are equivalent, so we set it to 100 [env: VM_SWAPPINESS=] [default: 100]
+      --vm-min-free-kbytes <VM_MIN_FREE_KBYTES>
+          Always reserve a minimum amount of actual free RAM. Setting this value to 1GiB makes it much less likely that we hit OOM while we still have swap space available we could have used [env: VM_MIN_FREE_KBYTES=] [default: 1048576]
+      --vm-watermark-scale-factor <VM_WATERMARK_SCALE_FACTOR>
+          Increase the aggressiveness of kswapd. Higher values will cause kswapd to swap more and earlier [env: VM_WATERMARK_SCALE_FACTOR=] [default: 100]
 ```
 
 ## Kubernetes Integration
