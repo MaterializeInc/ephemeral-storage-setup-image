@@ -1,7 +1,9 @@
+use std::io::ErrorKind;
+use std::process::exit;
 use std::thread::sleep;
 use std::time::Duration;
 
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand};
 
 use ephemeral_storage_setup::detect::DiskDetector;
 use ephemeral_storage_setup::lvm::LvmController;
@@ -11,8 +13,16 @@ use ephemeral_storage_setup::{CloudProvider, Commander};
 #[derive(Parser)]
 #[clap(name = "disk-setup")]
 struct CliArgs {
+    /// What action to take.
+    ///
+    /// If not provided, we attempt to detect the arguments from user-data files.
+    /// This case is useful for BottleRocket and other environments that allow
+    /// configuration with containers, but don't allow args to be passed to them.
+    ///
+    /// If using user-data, the files must contain a json array of args.
+    /// Do not include the executable name in the array.
     #[command(subcommand)]
-    command: Commands,
+    command: Option<Commands>,
 }
 
 #[derive(Subcommand)]
@@ -28,6 +38,12 @@ enum Commands {
     Swap {
         #[clap(flatten)]
         common_args: CommonArgs,
+
+        /// Apply sysctl settings to make swap more effective and safer.
+        ///
+        /// This doesn't work on bottlerocket.
+        #[clap(long, env)]
+        apply_sysctls: bool,
 
         /// Controls the weight of application data vs filesystem cache
         /// when moving data out of memory and into swap.
@@ -71,10 +87,39 @@ struct CommonArgs {
     remove_taint: bool,
 }
 
+fn print_help_and_exit() -> ! {
+    CliArgs::command().print_help().unwrap();
+    exit(2)
+}
+
 fn main() {
     let args = CliArgs::parse();
+    let command = args.command.unwrap_or_else(|| {
+        // If they didn't pass a command, try to detect if we're a bottlerocket
+        // bootstrap container with the args in user-data.
+        let userdata_path = "/.bottlerocket/bootstrap-containers/current/user-data";
+        match std::fs::read_to_string(userdata_path) {
+            Ok(userdata) => {
+                println!("Found userdata at '{userdata_path}'");
+                let args: Vec<String> =
+                    serde_json::from_str(&userdata).expect("Userdata must be a json array of args");
+                CliArgs::parse_from(
+                    // Clap expects the first argument to be the name of the executable,
+                    // but it doesn't really make sense for that to be set by the user here.
+                    std::iter::once("ephemeral-storage-setup")
+                        .chain(args.iter().map(|s| s.as_str())),
+                )
+                .command
+                .unwrap_or_else(|| {
+                    print_help_and_exit();
+                })
+            }
+            Err(e) if e.kind() == ErrorKind::NotFound => print_help_and_exit(),
+            Err(e) => panic!("{e:?}"),
+        }
+    });
     let commander = Commander::default();
-    match args.command {
+    match command {
         Commands::Lvm {
             common_args:
                 CommonArgs {
@@ -110,6 +155,7 @@ fn main() {
                     taint_key,
                     remove_taint,
                 },
+            apply_sysctls,
             vm_swappiness,
             vm_min_free_kbytes,
             vm_watermark_scale_factor,
@@ -126,6 +172,7 @@ fn main() {
                         node_name,
                         taint_key,
                         remove_taint,
+                        apply_sysctls,
                         vm_swappiness,
                         vm_min_free_kbytes,
                         vm_watermark_scale_factor,
