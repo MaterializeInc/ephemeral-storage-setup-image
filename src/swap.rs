@@ -7,6 +7,7 @@ pub struct SwapController<D: DiskDetectorTrait> {
     pub disk_detector: D,
     pub node_name: Option<String>,
     pub taint_key: String,
+    pub bottlerocket_enable_swap: bool,
     pub remove_taint: bool,
     pub apply_sysctls: bool,
     pub vm_swappiness: usize,
@@ -30,6 +31,15 @@ impl<D: DiskDetectorTrait> SwapController<D> {
             self.sysctl("vm.swappiness", self.vm_swappiness);
             self.sysctl("vm.min_free_kbytes", self.vm_min_free_kbytes);
             self.sysctl("vm.watermark_scale_factor", self.vm_watermark_scale_factor);
+        }
+
+        if self.bottlerocket_enable_swap {
+            println!("Enabling swap with the Bottlerocket apiclient");
+            self.commander.check_output(&[
+                "apiclient",
+                "set",
+                "settings.kubernetes.memory-swap-behavior=LimitedSwap",
+            ]);
         }
 
         println!("Swap setup completed successfully");
