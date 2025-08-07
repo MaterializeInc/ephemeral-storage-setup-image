@@ -39,6 +39,10 @@ enum Commands {
         #[clap(flatten)]
         common_args: CommonArgs,
 
+        /// Enable swap on bottlerocket nodes using its apiclient.
+        #[clap(long, env)]
+        bottlerocket_enable_swap: bool,
+
         /// Apply sysctl settings to make swap more effective and safer.
         ///
         /// This doesn't work on bottlerocket.
@@ -155,6 +159,7 @@ fn main() {
                     taint_key,
                     remove_taint,
                 },
+            bottlerocket_enable_swap,
             apply_sysctls,
             vm_swappiness,
             vm_min_free_kbytes,
@@ -172,6 +177,7 @@ fn main() {
                         node_name,
                         taint_key,
                         remove_taint,
+                        bottlerocket_enable_swap,
                         apply_sysctls,
                         vm_swappiness,
                         vm_min_free_kbytes,
