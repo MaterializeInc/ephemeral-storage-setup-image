@@ -34,14 +34,16 @@ user-data = "WyJzd2FwIiwgIi0tY2xvdWQtcHJvdmlkZXIiLCAiYXdzIl0K"
 "vm.watermark_scale_factor" = "100"
 ```
 
-##### GCP note
+##### GCP notes
 In GCP the `konnectivity-agent` pods are needed to retrieve any pod logs.
 If those run only on nodes with this taint and they do not tolerate it, all pod logs will be inaccessible until the taint is removed.
 In the case of failure of the ephemeral disk setup pods, it may be difficult to debug them, as their logs will be inaccessible.
 
 Configuring the `konnectivity-agent` pods to either tolerate the `disk-unconfigured` taint, or to run on nodes without that taint will allow logs to be accessible as normal. A separate pool of nodes for system daemons without ephemeral disks should work fine.
 
-##### Azure note
+Additionally, GKE does not currently support configuring the kubelet for swap. As such, this image can configure the disks for swap, but can only enable kubelet support through hackily modifying the config and restarting the kubelet. This is fragile, and any change to the kubelet configuration by the cloud provider may break it. If you still want to use this, the image has a `--hack-restart-kubelet-enable-swap` flag.
+
+##### Azure notes
 Azure AKS nodes do not support removing taints.
 The issue for fixing this was closed (https://github.com/Azure/AKS/issues/2934), so it is unlikely Microsoft will support this any time soon.
 As such, you should not pass the `--remove-taint` argument to the ephemeral disk setup pods, and should not configure your nodes to start with the `disk-unconfigured` taint.
@@ -49,6 +51,8 @@ During the time between the node launching and the ephemeral volumes being confi
 This is a sad state of affairs for Azure Kubernetes, and we recommend that you contact your Azure support representative to encourage them to fix this.
 
 There is a work around possible by using an admission controller to apply the taint when the node is created, rather than configuring it using AKS. This is unfortunately out of the scope of this tool for now.
+
+Additionally, Azure does not currently support configuring the kubelet for swap. As such, this image can configure the disks for swap, but can only enable kubelet support through hackily modifying the config and restarting the kubelet. This is fragile, and any change to the kubelet configuration by the cloud provider may break it. If you still want to use this, the image has a `--hack-restart-kubelet-enable-swap` flag.
 
 ## Usage
 
@@ -83,6 +87,10 @@ Options:
           Name of the taint to remove [env: TAINT_KEY=] [default: disk-unconfigured]
       --remove-taint
           [env: REMOVE_TAINT=]
+      --bottlerocket-enable-swap
+          Enable swap on bottlerocket nodes using its apiclient [env: BOTTLEROCKET_ENABLE_SWAP=]
+      --hack-restart-kubelet-enable-swap
+          Enable swap by hackily modifying the kubelet config and restarting it [env: HACK_RESTART_KUBELET_ENABLE_SWAP=]
       --apply-sysctls
           Apply sysctl settings to make swap more effective and safer [env: APPLY_SYSCTLS=]
       --vm-swappiness <VM_SWAPPINESS>

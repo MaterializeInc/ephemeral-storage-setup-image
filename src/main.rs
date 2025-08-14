@@ -40,8 +40,12 @@ enum Commands {
         common_args: CommonArgs,
 
         /// Enable swap on bottlerocket nodes using its apiclient.
-        #[clap(long, env)]
+        #[clap(long, env, group = "swap-hacks")]
         bottlerocket_enable_swap: bool,
+
+        /// Enable swap by hackily modifying the kubelet config and restarting it.
+        #[clap(long, env, group = "swap-hacks")]
+        hack_restart_kubelet_enable_swap: bool,
 
         /// Apply sysctl settings to make swap more effective and safer.
         ///
@@ -160,6 +164,7 @@ fn main() {
                     remove_taint,
                 },
             bottlerocket_enable_swap,
+            hack_restart_kubelet_enable_swap,
             apply_sysctls,
             vm_swappiness,
             vm_min_free_kbytes,
@@ -172,12 +177,14 @@ fn main() {
                 .unwrap()
                 .block_on(
                     SwapController {
+                        cloud_provider,
                         commander,
                         disk_detector,
                         node_name,
                         taint_key,
                         remove_taint,
                         bottlerocket_enable_swap,
+                        hack_restart_kubelet_enable_swap,
                         apply_sysctls,
                         vm_swappiness,
                         vm_min_free_kbytes,
