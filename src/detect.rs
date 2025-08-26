@@ -170,7 +170,7 @@ impl DiskDetector {
         // filter to local SSDs. We don't only use `find`
         // because the devices might have partitions or other
         // children we need to filter out.
-        let find_paths = self.find("/dev/disk/by-id", "google-local-ssd-*");
+        let find_paths = self.find("/dev/disk/by-id", "google-local-nvme-ssd-*");
         self.lsblk()
             .paths()
             .filter(|path| find_paths.contains(path))
