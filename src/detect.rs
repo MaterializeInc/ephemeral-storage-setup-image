@@ -170,7 +170,12 @@ impl DiskDetector {
         // filter to local SSDs. We don't only use `find`
         // because the devices might have partitions or other
         // children we need to filter out.
-        let find_paths = self.find("/dev/disk/by-id", "google-local-nvme-ssd-*");
+        // All local disks will take the form of google-local-*.
+        // We'll make the assumption that the machine has homogeneous
+        // disk setup, and that the disks the user configured or are
+        // provided by the machine are NVME or equivilently fast.
+        let find_paths = [self.find("/dev/disk/by-id", "google-local-*")].concat();
+
         self.lsblk()
             .paths()
             .filter(|path| find_paths.contains(path))
