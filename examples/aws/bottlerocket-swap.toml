@@ -1,0 +1,11 @@
+[settings.bootstrap-containers.diskstrap]
+source = "docker.io/materialize/ephemeral-storage-setup-image:v0.4.0"
+mode = "once"
+essential = "true"
+# ["swap", "--cloud-provider", "aws", "--bottlerocket-enable-swap"]
+user-data = "WyJzd2FwIiwgIi0tY2xvdWQtcHJvdmlkZXIiLCAiYXdzIiwgIi0tYm90dGxlcm9ja2V0LWVuYWJsZS1zd2FwIl0="
+
+[kernel.sysctl]
+"vm.swappiness" = "100"
+"vm.min_free_kbytes" = "1048576"
+"vm.watermark_scale_factor" = "100"
