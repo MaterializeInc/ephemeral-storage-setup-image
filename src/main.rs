@@ -9,6 +9,9 @@ use ephemeral_storage_setup::detect::DiskDetector;
 use ephemeral_storage_setup::lvm::LvmController;
 use ephemeral_storage_setup::swap::SwapController;
 use ephemeral_storage_setup::{CloudProvider, Commander};
+use tracing::info;
+use tracing::level_filters::LevelFilter;
+use tracing_subscriber::EnvFilter;
 
 #[derive(Parser)]
 #[clap(name = "disk-setup")]
@@ -102,13 +105,20 @@ fn print_help_and_exit() -> ! {
 
 fn main() {
     let args = CliArgs::parse();
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            EnvFilter::builder()
+                .with_default_directive(LevelFilter::DEBUG.into())
+                .from_env_lossy(),
+        )
+        .init();
     let command = args.command.unwrap_or_else(|| {
         // If they didn't pass a command, try to detect if we're a bottlerocket
         // bootstrap container with the args in user-data.
         let userdata_path = "/.bottlerocket/bootstrap-containers/current/user-data";
         match std::fs::read_to_string(userdata_path) {
             Ok(userdata) => {
-                println!("Found userdata at '{userdata_path}'");
+                info!("Found userdata at '{userdata_path}'");
                 let args: Vec<String> =
                     serde_json::from_str(&userdata).expect("Userdata must be a json array of args");
                 CliArgs::parse_from(

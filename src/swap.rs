@@ -3,6 +3,7 @@ use std::fs;
 use std::io::ErrorKind;
 
 use serde_yaml::{Mapping, Value};
+use tracing::info;
 
 use crate::detect::DiskDetectorTrait;
 use crate::remove_taint::remove_taint;
@@ -24,25 +25,25 @@ pub struct SwapController<D: DiskDetectorTrait> {
 }
 impl<D: DiskDetectorTrait> SwapController<D> {
     pub async fn setup(&self) {
-        println!("Starting NVMe disk configuration with swap...");
+        info!("Starting NVMe disk configuration with swap...");
         let devices = self.disk_detector.detect_devices();
         for device in &devices {
             if !self.is_existing_swap(device) {
-                println!("Configuring swap on {device}");
+                info!("Configuring swap on {device}");
                 self.mkswap(device);
                 self.swapon(device);
             }
         }
 
         if self.apply_sysctls {
-            println!("Setting sysctls to improve swap performance and safety");
+            info!("Setting sysctls to improve swap performance and safety");
             self.sysctl("vm.swappiness", self.vm_swappiness);
             self.sysctl("vm.min_free_kbytes", self.vm_min_free_kbytes);
             self.sysctl("vm.watermark_scale_factor", self.vm_watermark_scale_factor);
         }
 
         if self.bottlerocket_enable_swap {
-            println!("Enabling swap with the Bottlerocket apiclient");
+            info!("Enabling swap with the Bottlerocket apiclient");
             self.commander.check_output(&[
                 "apiclient",
                 "set",
@@ -51,7 +52,7 @@ impl<D: DiskDetectorTrait> SwapController<D> {
         }
 
         if self.hack_restart_kubelet_enable_swap {
-            println!("Hackily enabling swap by modifying the Kubelet config and restarting it.");
+            info!("Hackily enabling swap by modifying the Kubelet config and restarting it.");
             match self.cloud_provider {
                 CloudProvider::Gcp => {
                     self.update_kubelet_config("/host/home/kubernetes/kubelet-config.yaml");
@@ -87,7 +88,7 @@ Environment="KUBELET_CONFIG_FILE_FLAGS=--config /var/lib/kubelet/config.yaml""#,
             ]);
         }
 
-        println!("Swap setup completed successfully");
+        info!("Swap setup completed successfully");
         if self.remove_taint {
             remove_taint(
                 self.node_name.as_ref().expect("clap enforced"),

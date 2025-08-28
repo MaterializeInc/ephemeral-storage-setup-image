@@ -1,4 +1,5 @@
 use serde::Deserialize;
+use tracing::{debug, info};
 
 use crate::{CloudProvider, Commander};
 
@@ -39,8 +40,8 @@ impl<I: Iterator<Item = LsblkBlockDevice>> LsblkIteratorExt for I {
                 .model
                 .as_ref()
                 .map(|model| {
-                    println!("Checking model: {model}");
-                    println!("against filter: {model_filter}");
+                    debug!("Checking model: {model}");
+                    debug!("against filter: {model_filter}");
                     model.contains(model_filter)
                 })
                 .unwrap_or(false)
@@ -58,7 +59,7 @@ pub trait DiskDetectorTrait {
 
 impl DiskDetectorTrait for DiskDetector {
     fn detect_devices(&self) -> Vec<String> {
-        println!(
+        info!(
             "Detecting disks for cloud provider: {:?}",
             self.cloud_provider
         );
@@ -71,7 +72,7 @@ impl DiskDetectorTrait for DiskDetector {
         if devices.is_empty() {
             panic!("No suitable NVMe devices found");
         }
-        println!("Found devices: {:?}", &devices);
+        info!("Found devices: {:?}", &devices);
         devices
     }
 }
@@ -132,7 +133,6 @@ impl DiskDetector {
 
             #[cfg(test)]
             {
-                println!("{line}");
                 let ordinal = line.chars().last().unwrap();
                 format!("/dev/nvme{ordinal}n1")
             }
