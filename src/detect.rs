@@ -1,5 +1,5 @@
 use serde::Deserialize;
-use tracing::{debug, info};
+use tracing::{debug, info, trace};
 
 use crate::{CloudProvider, Commander};
 
@@ -96,47 +96,50 @@ impl DiskDetector {
         let output = self
             .commander
             .check_output(&["lsblk", "--json", "--output-all"]);
-        serde_json::from_slice::<Lsblk>(&output.stdout)
+        let lsblk_blockdevices = serde_json::from_slice::<Lsblk>(&output.stdout)
             .expect("Failed to deserialize output of 'lsblk --json --output-all'")
-            .blockdevices
-            .into_iter()
-            .filter(|device| {
-                if device.mountpoint.is_some() {
-                    debug!("Excluding device '{}' because it is mounted.", &device.path);
-                    return false;
-                }
+            .blockdevices;
+        trace!(
+            "lsblk block devices:\n{}",
+            String::from_utf8_lossy(&output.stdout)
+        );
+        lsblk_blockdevices.into_iter().filter(|device| {
+            if device.mountpoint.is_some() {
+                debug!("Excluding device '{}' because it is mounted.", &device.path);
+                return false;
+            }
 
-                if device
-                    .children
-                    .as_ref()
-                    .map(|children| !children.is_empty())
-                    .unwrap_or(false)
-                {
-                    debug!(
-                        "Excluding device '{}' because it has children.",
-                        &device.path
-                    );
-                    return false;
-                }
+            if device
+                .children
+                .as_ref()
+                .map(|children| !children.is_empty())
+                .unwrap_or(false)
+            {
+                debug!(
+                    "Excluding device '{}' because it has children.",
+                    &device.path
+                );
+                return false;
+            }
 
-                if device.tran.as_deref() != Some("nvme") {
-                    debug!(
-                        "Excluding device '{}' because it is not connected by nvme.",
-                        &device.path
-                    );
-                    return false;
-                }
+            if device.tran.as_deref() != Some("nvme") {
+                debug!(
+                    "Excluding device '{}' because it is not connected by nvme.",
+                    &device.path
+                );
+                return false;
+            }
 
-                if device.type_ != "disk" {
-                    debug!(
-                        "Excluding device '{}' because its type is not disk.",
-                        &device.path
-                    );
-                    return false;
-                }
+            if device.type_ != "disk" {
+                debug!(
+                    "Excluding device '{}' because its type is not disk.",
+                    &device.path
+                );
+                return false;
+            }
 
-                true
-            })
+            true
+        })
     }
 
     fn find(&self, dir: &str, name: &str) -> Vec<String> {
@@ -170,6 +173,10 @@ impl DiskDetector {
         .collect();
         devices.sort();
         devices.dedup();
+        trace!(
+            "found devices in {dir} matching name {name}:\n{:?}",
+            &devices
+        );
         devices
     }
 
