@@ -40,9 +40,12 @@ impl<I: Iterator<Item = LsblkBlockDevice>> LsblkIteratorExt for I {
                 .model
                 .as_ref()
                 .map(|model| {
-                    debug!("Checking model: {model}");
-                    debug!("against filter: {model_filter}");
-                    model.contains(model_filter)
+                    if model.contains(model_filter) {
+                        true
+                    } else {
+                        debug!("Excluding model '{model}' because it doesn't match filter '{model_filter}'");
+                        false
+                    }
                 })
                 .unwrap_or(false)
         })
@@ -98,14 +101,41 @@ impl DiskDetector {
             .blockdevices
             .into_iter()
             .filter(|device| {
-                device.mountpoint.is_none()
-                    && device
-                        .children
-                        .as_ref()
-                        .map(|children| children.is_empty())
-                        .unwrap_or(true)
-                    && device.tran.as_deref() == Some("nvme")
-                    && device.type_ == "disk"
+                if device.mountpoint.is_some() {
+                    debug!("Excluding device '{}' because it is mounted.", &device.path);
+                    return false;
+                }
+
+                if device
+                    .children
+                    .as_ref()
+                    .map(|children| !children.is_empty())
+                    .unwrap_or(false)
+                {
+                    debug!(
+                        "Excluding device '{}' because it has children.",
+                        &device.path
+                    );
+                    return false;
+                }
+
+                if device.tran.as_deref() != Some("nvme") {
+                    debug!(
+                        "Excluding device '{}' because it is not connected by nvme.",
+                        &device.path
+                    );
+                    return false;
+                }
+
+                if device.type_ != "disk" {
+                    debug!(
+                        "Excluding device '{}' because its type is not disk.",
+                        &device.path
+                    );
+                    return false;
+                }
+
+                true
             })
     }
 
@@ -174,7 +204,7 @@ impl DiskDetector {
         // We'll make the assumption that the machine has homogeneous
         // disk setup, and that the disks the user configured or are
         // provided by the machine are NVME or equivilently fast.
-        let find_paths = [self.find("/dev/disk/by-id", "google-local-*")].concat();
+        let find_paths = self.find("/dev/disk/by-id", "google-local-*");
 
         self.lsblk()
             .paths()
