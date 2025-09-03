@@ -1,6 +1,6 @@
 [package]
 name = "ephemeral-storage-setup"
-version = "0.3.3"
+version = "0.3.4"
 edition = "2024"
 rust-version = "1.88.0"
 resolver = "2"
@@ -19,6 +19,8 @@ serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.140"
 serde_yaml = "0.9.34"
 tokio = { version = "1.46.1", features = ["rt"] }
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 
 [dev-dependencies]
 tempfile = "3.20.0"

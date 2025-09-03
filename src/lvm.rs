@@ -1,4 +1,5 @@
 use serde::Deserialize;
+use tracing::info;
 
 use crate::Commander;
 use crate::detect::DiskDetectorTrait;
@@ -36,9 +37,9 @@ pub struct LvmController<D: DiskDetectorTrait> {
 
 impl<D: DiskDetectorTrait> LvmController<D> {
     pub async fn setup(&self) {
-        println!("Starting NVMe disk configuration with LVM...");
+        info!("Starting NVMe disk configuration with LVM...");
         if self.volume_group_exists() {
-            println!("Volume group {} already exists.", self.vg_name);
+            info!("Volume group {} already exists.", self.vg_name);
         } else {
             let devices = self.disk_detector.detect_devices();
             for device in &devices {
@@ -48,7 +49,7 @@ impl<D: DiskDetectorTrait> LvmController<D> {
             }
             self.vgcreate(&devices);
         }
-        println!("LVM setup completed successfully");
+        info!("LVM setup completed successfully");
         if self.remove_taint {
             remove_taint(
                 self.node_name.as_ref().expect("clap enforced"),
@@ -87,12 +88,12 @@ impl<D: DiskDetectorTrait> LvmController<D> {
     }
 
     fn pvcreate(&self, device: &str) {
-        println!("Creating physical volume on {device}");
+        info!("Creating physical volume on {device}");
         self.commander.check_output(&["pvcreate", "-f", device]);
     }
 
     fn vgcreate(&self, devices: &[String]) {
-        println!("Creating volume group {}", &self.vg_name);
+        info!("Creating volume group {}", &self.vg_name);
         let mut args = Vec::with_capacity(devices.len() + 2);
         args.push("vgcreate");
         args.push(&self.vg_name);

@@ -1,6 +1,7 @@
 use k8s_openapi::api::core::v1::Node;
 use kube::api::PostParams;
 use kube::{Api, Client};
+use tracing::{info, warn};
 
 use crate::load_kube_config;
 
@@ -15,10 +16,10 @@ pub(crate) async fn remove_taint(node_name: &str, taint_key: &str) {
             .await
             .unwrap_or_else(|e| panic!("Failed to get node {node_name}: {e:?}"));
         let Some(taint_position) = taint_position(taint_key, &node) else {
-            println!("Node {node_name} is not tainted");
+            info!("Node {node_name} is not tainted");
             return;
         };
-        println!("Removing taint {taint_key} from node {node_name}");
+        info!("Removing taint {taint_key} from node {node_name}");
         node.spec
             .as_mut()
             .unwrap()
@@ -31,11 +32,11 @@ pub(crate) async fn remove_taint(node_name: &str, taint_key: &str) {
             .await
         {
             Ok(_) => {
-                println!("Taint {taint_key} removed");
+                info!("Taint {taint_key} removed");
                 return;
             }
             Err(kube::Error::Api(e)) if e.code == 409 => {
-                println!("Conflict while replacing node");
+                warn!("Conflict while replacing node");
             }
             Err(e) => panic!("{}", e),
         };

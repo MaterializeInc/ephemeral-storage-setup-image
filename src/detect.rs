@@ -1,4 +1,5 @@
 use serde::Deserialize;
+use tracing::{debug, info, trace};
 
 use crate::{CloudProvider, Commander};
 
@@ -39,9 +40,12 @@ impl<I: Iterator<Item = LsblkBlockDevice>> LsblkIteratorExt for I {
                 .model
                 .as_ref()
                 .map(|model| {
-                    println!("Checking model: {model}");
-                    println!("against filter: {model_filter}");
-                    model.contains(model_filter)
+                    if model.contains(model_filter) {
+                        true
+                    } else {
+                        debug!("Excluding model '{model}' because it doesn't match filter '{model_filter}'");
+                        false
+                    }
                 })
                 .unwrap_or(false)
         })
@@ -58,7 +62,7 @@ pub trait DiskDetectorTrait {
 
 impl DiskDetectorTrait for DiskDetector {
     fn detect_devices(&self) -> Vec<String> {
-        println!(
+        info!(
             "Detecting disks for cloud provider: {:?}",
             self.cloud_provider
         );
@@ -71,7 +75,7 @@ impl DiskDetectorTrait for DiskDetector {
         if devices.is_empty() {
             panic!("No suitable NVMe devices found");
         }
-        println!("Found devices: {:?}", &devices);
+        info!("Found devices: {:?}", &devices);
         devices
     }
 }
@@ -92,20 +96,50 @@ impl DiskDetector {
         let output = self
             .commander
             .check_output(&["lsblk", "--json", "--output-all"]);
-        serde_json::from_slice::<Lsblk>(&output.stdout)
+        let lsblk_blockdevices = serde_json::from_slice::<Lsblk>(&output.stdout)
             .expect("Failed to deserialize output of 'lsblk --json --output-all'")
-            .blockdevices
-            .into_iter()
-            .filter(|device| {
-                device.mountpoint.is_none()
-                    && device
-                        .children
-                        .as_ref()
-                        .map(|children| children.is_empty())
-                        .unwrap_or(true)
-                    && device.tran.as_deref() == Some("nvme")
-                    && device.type_ == "disk"
-            })
+            .blockdevices;
+        trace!(
+            "lsblk block devices:\n{}",
+            String::from_utf8_lossy(&output.stdout)
+        );
+        lsblk_blockdevices.into_iter().filter(|device| {
+            if device.mountpoint.is_some() {
+                debug!("Excluding device '{}' because it is mounted.", &device.path);
+                return false;
+            }
+
+            if device
+                .children
+                .as_ref()
+                .map(|children| !children.is_empty())
+                .unwrap_or(false)
+            {
+                debug!(
+                    "Excluding device '{}' because it has children.",
+                    &device.path
+                );
+                return false;
+            }
+
+            if device.tran.as_deref() != Some("nvme") {
+                debug!(
+                    "Excluding device '{}' because it is not connected by nvme.",
+                    &device.path
+                );
+                return false;
+            }
+
+            if device.type_ != "disk" {
+                debug!(
+                    "Excluding device '{}' because its type is not disk.",
+                    &device.path
+                );
+                return false;
+            }
+
+            true
+        })
     }
 
     fn find(&self, dir: &str, name: &str) -> Vec<String> {
@@ -132,7 +166,6 @@ impl DiskDetector {
 
             #[cfg(test)]
             {
-                println!("{line}");
                 let ordinal = line.chars().last().unwrap();
                 format!("/dev/nvme{ordinal}n1")
             }
@@ -140,6 +173,10 @@ impl DiskDetector {
         .collect();
         devices.sort();
         devices.dedup();
+        trace!(
+            "found devices in {dir} matching name {name}:\n{:?}",
+            &devices
+        );
         devices
     }
 
@@ -174,7 +211,7 @@ impl DiskDetector {
         // We'll make the assumption that the machine has homogeneous
         // disk setup, and that the disks the user configured or are
         // provided by the machine are NVME or equivilently fast.
-        let find_paths = [self.find("/dev/disk/by-id", "google-local-*")].concat();
+        let find_paths = self.find("/dev/disk/by-id", "google-local-*");
 
         self.lsblk()
             .paths()
