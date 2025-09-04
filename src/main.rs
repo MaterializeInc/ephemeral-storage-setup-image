@@ -91,7 +91,11 @@ struct CommonArgs {
     node_name: Option<String>,
 
     /// Name of the taint to remove.
-    #[clap(long, env, default_value = "disk-unconfigured")]
+    #[clap(
+        long,
+        env,
+        default_value = "startup-taint.cluster-autoscaler.kubernetes.io/disk-unconfigured"
+    )]
     taint_key: String,
 
     #[clap(long, env, requires_if("true", "node_name"))]
