@@ -166,7 +166,7 @@ resource "kubernetes_daemonset" "disk_setup" {
         }
         # Node taint to prevent regular workloads from being scheduled until disks are configured
         toleration {
-          key      = "disk-unconfigured"
+          key      = "startup-taint.cluster-autoscaler.kubernetes.io/disk-unconfigured"
           operator = "Exists"
           effect   = "NoSchedule"
         }
