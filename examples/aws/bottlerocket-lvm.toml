@@ -1,0 +1,6 @@
+[settings.bootstrap-containers.diskstrap]
+source = "docker.io/materialize/ephemeral-storage-setup-image:v0.4.0"
+mode = "once"
+essential = "true"
+# ["lvm", "--cloud-provider", "aws"]
+user-data = "WyJsdm0iLCAiLS1jbG91ZC1wcm92aWRlciIsICJhd3MiXQ=="
