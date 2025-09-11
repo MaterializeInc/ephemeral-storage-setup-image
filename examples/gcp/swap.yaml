@@ -78,6 +78,7 @@ spec:
             - gcp
             - --remove-taint
             - --hack-restart-kubelet-enable-swap
+            - --apply-sysctls
           resources:
             limits:
               memory: 128Mi
