@@ -116,7 +116,7 @@ It is recommended that any daemonsets required for networking or logs run on oth
 
 ### Terraform Example (swap)
 
-The example below is for configuring disks as swap space. If you would like to use the disks as an LVM volume group, simply replace the `swap` argument with `lvm`.
+The example below is for configuring disks as swap space in GCP. If you would like to use the disks as an LVM volume group, simply replace the `swap` argument with `lvm`, and remove the `--hack-restart-kubelet-enable-swap` and `--apply-sysctls` arguments.
 
 ```hcl
 resource "kubernetes_daemonset" "disk_setup" {
@@ -180,8 +180,10 @@ resource "kubernetes_daemonset" "disk_setup" {
           args    = [
             "swap",
             "--cloud-provider",
-            var.cloud_provider,
+            "gcp",
             "--remove-taint",
+            "--hack-restart-kubelet-enable-swap",
+            "--apply-sysctls",
           ]
           resources {
             limits = {
