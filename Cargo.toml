@@ -2,7 +2,7 @@
 name = "ephemeral-storage-setup"
 version = "0.4.0"
 edition = "2024"
-rust-version = "1.88.0"
+rust-version = "1.89.0"
 resolver = "2"
 publish = false
 
