@@ -106,7 +106,8 @@ Environment="KUBELET_CONFIG_FILE_FLAGS=--config /var/lib/kubelet/config.yaml""#,
         // Explicitly set all devices to the same priority, so Linux will
         // allocate pages to disks round-robin, allowing for faster I/O
         // on machines with multiple disks.
-        self.commander.check_output(&["swapon", "-p", "10", device]);
+        self.commander
+            .check_output(&["swapon", "-p", "2048", device]);
     }
 
     fn is_existing_swap(&self, device: &str) -> bool {
