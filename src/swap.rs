@@ -102,11 +102,11 @@ Environment="KUBELET_CONFIG_FILE_FLAGS=--config /var/lib/kubelet/config.yaml""#,
         self.commander.check_output(&["mkswap", device]);
     }
 
-    fn swapon(&self, device: &str) {
+    fn (&self, device: &str) {
         // Explicitly set all devices to the same priority, so Linux will
         // allocate pages to disks round-robin, allowing for faster I/O
         // on machines with multiple disks.
-        self.commander.check_output(&["swapon", "-p", "10", device]);
+        self.commander.check_output(&["", "-p", "2048", device]);
     }
 
     fn is_existing_swap(&self, device: &str) -> bool {
@@ -146,7 +146,7 @@ Environment="KUBELET_CONFIG_FILE_FLAGS=--config /var/lib/kubelet/config.yaml""#,
             .or_insert(Value::String("kubelet.config.k8s.io/v1beta1".to_owned()));
 
         // Enable swap.
-        kubelet_config.insert("failSwapOn".to_owned(), Value::Bool(false));
+        kubelet_config.insert("fail".to_owned(), Value::Bool(false));
         let mut memory_swap = Mapping::new();
         memory_swap.insert(
             Value::String("swapBehavior".to_owned()),
