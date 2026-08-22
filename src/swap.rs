@@ -7,7 +7,7 @@ use tracing::info;
 
 use crate::detect::DiskDetectorTrait;
 use crate::remove_taint::remove_taint;
-use crate::{CloudProvider, Commander};
+use crate::{CloudProvider, Commander, set_read_ahead_kb};
 
 pub struct SwapController<D: DiskDetectorTrait> {
     pub cloud_provider: CloudProvider,
@@ -22,12 +22,14 @@ pub struct SwapController<D: DiskDetectorTrait> {
     pub vm_swappiness: usize,
     pub vm_min_free_kbytes: usize,
     pub vm_watermark_scale_factor: usize,
+    pub read_ahead_kb: usize,
 }
 impl<D: DiskDetectorTrait> SwapController<D> {
     pub async fn setup(&self) {
         info!("Starting NVMe disk configuration with swap...");
         let devices = self.disk_detector.detect_devices();
         for device in &devices {
+            set_read_ahead_kb(device, self.read_ahead_kb);
             if !self.is_existing_swap(device) {
                 info!("Configuring swap on {device}");
                 self.mkswap(device);

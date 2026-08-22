@@ -1,9 +1,11 @@
+use std::fs;
+
 use serde::Deserialize;
 use tracing::info;
 
-use crate::Commander;
 use crate::detect::DiskDetectorTrait;
 use crate::remove_taint::remove_taint;
+use crate::{Commander, set_read_ahead_kb};
 
 #[derive(Deserialize)]
 struct LvmReportWrapper {
@@ -33,15 +35,19 @@ pub struct LvmController<D: DiskDetectorTrait> {
     pub taint_key: String,
     pub remove_taint: bool,
     pub vg_name: String,
+    pub read_ahead_kb: usize,
 }
 
 impl<D: DiskDetectorTrait> LvmController<D> {
     pub async fn setup(&self) {
         info!("Starting NVMe disk configuration with LVM...");
+        let devices = self.disk_detector.detect_devices();
+        for device in &devices {
+            set_read_ahead_kb(device, self.read_ahead_kb);
+        }
         if self.volume_group_exists() {
             info!("Volume group {} already exists.", self.vg_name);
         } else {
-            let devices = self.disk_detector.detect_devices();
             for device in &devices {
                 if !self.physical_volume_exists(device) {
                     self.pvcreate(device);

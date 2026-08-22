@@ -1,8 +1,10 @@
 use std::collections::HashMap;
+use std::fs;
 use std::process::{Command, Output};
 use std::time::Duration;
 
 use clap::ValueEnum;
+use tracing::{error, info};
 
 pub mod detect;
 pub mod lvm;
@@ -64,6 +66,15 @@ pub async fn load_kube_config() -> kube::Config {
     config.write_timeout = Some(Duration::from_secs(30));
 
     config
+}
+
+fn set_read_ahead_kb(device: &str, read_ahead_kb: usize) {
+    // Extract device name from path (e.g., /dev/nvme0n1 -> nvme0n1)
+    let device_name = device.rsplit('/').next().expect("invalid device path");
+    let sysfs_path = format!("/sys/block/{device_name}/queue/read_ahead_kb");
+    info!("Setting read_ahead_kb to {} for {device}", read_ahead_kb);
+    fs::write(&sysfs_path, read_ahead_kb.to_string())
+        .unwrap_or_else(|e| error!("failed to write to {sysfs_path}: {e}")); // Don't panic as this is a secondary optimization
 }
 
 #[cfg(test)]

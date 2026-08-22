@@ -100,6 +100,11 @@ struct CommonArgs {
 
     #[clap(long, env, requires_if("true", "node_name"))]
     remove_taint: bool,
+
+    /// Set the read-ahead buffer size (in KB) for all detected devices.
+    /// This controls how much data the kernel prefetches when reading from disk.
+    #[arg(long, env, default_value_t = 20480)]
+    read_ahead_kb: usize,
 }
 
 fn print_help_and_exit() -> ! {
@@ -149,6 +154,7 @@ fn main() {
                     node_name,
                     taint_key,
                     remove_taint,
+                    read_ahead_kb,
                 },
             vg_name,
         } => {
@@ -165,6 +171,7 @@ fn main() {
                         taint_key,
                         remove_taint,
                         vg_name,
+                        read_ahead_kb,
                     }
                     .setup(),
                 )
@@ -176,6 +183,7 @@ fn main() {
                     node_name,
                     taint_key,
                     remove_taint,
+                    read_ahead_kb,
                 },
             bottlerocket_enable_swap,
             hack_restart_kubelet_enable_swap,
@@ -203,6 +211,7 @@ fn main() {
                         vm_swappiness,
                         vm_min_free_kbytes,
                         vm_watermark_scale_factor,
+                        read_ahead_kb,
                     }
                     .setup(),
                 )
