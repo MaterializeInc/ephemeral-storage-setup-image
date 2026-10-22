@@ -55,12 +55,12 @@ impl<D: DiskDetectorTrait> SwapController<D> {
             info!("Hackily enabling swap by modifying the Kubelet config and restarting it.");
             match self.cloud_provider {
                 CloudProvider::Gcp => {
-                    self.update_kubelet_config("/host/home/kubernetes/kubelet-config.yaml");
+                    update_kubelet_config("/host/home/kubernetes/kubelet-config.yaml");
                 }
                 CloudProvider::Azure => {
                     // Azure doesn't use a kubelet config file by default,
                     // and there isn't a command line flag to enable LimitedSwap.
-                    self.update_kubelet_config("/host/var/lib/kubelet/config.yaml");
+                    update_kubelet_config("/host/var/lib/kubelet/config.yaml");
                     // Azure does reference an env var for the kubelet config file args,
                     // but it isn't set initially.
                     fs::write(
@@ -129,33 +129,33 @@ Environment="KUBELET_CONFIG_FILE_FLAGS=--config /var/lib/kubelet/config.yaml""#,
         self.commander
             .check_output(&["sysctl", &format!("{key}={value}")]);
     }
+}
 
-    fn update_kubelet_config(&self, path: &str) {
-        // Read existing configuration, if any.
-        let mut kubelet_config: BTreeMap<String, Value> = match fs::read(path) {
-            Ok(data) => serde_yaml::from_slice(&data).unwrap(),
-            Err(e) if e.kind() == ErrorKind::NotFound => BTreeMap::new(),
-            Err(e) => panic!("failed to read kubelet config {path}: {e:?}"),
-        };
+fn update_kubelet_config(path: &str) {
+    // Read existing configuration, if any.
+    let mut kubelet_config: BTreeMap<String, Value> = match fs::read(path) {
+        Ok(data) => serde_yaml::from_slice(&data).unwrap(),
+        Err(e) if e.kind() == ErrorKind::NotFound => BTreeMap::new(),
+        Err(e) => panic!("failed to read kubelet config {path}: {e:?}"),
+    };
 
-        // Ensure we have the type information, in case we're making a new file.
-        kubelet_config
-            .entry("kind".to_owned())
-            .or_insert(Value::String("KubeletConfiguration".to_owned()));
-        kubelet_config
-            .entry("apiVersion".to_owned())
-            .or_insert(Value::String("kubelet.config.k8s.io/v1beta1".to_owned()));
+    // Ensure we have the type information, in case we're making a new file.
+    kubelet_config
+        .entry("kind".to_owned())
+        .or_insert(Value::String("KubeletConfiguration".to_owned()));
+    kubelet_config
+        .entry("apiVersion".to_owned())
+        .or_insert(Value::String("kubelet.config.k8s.io/v1beta1".to_owned()));
 
-        // Enable swap.
-        kubelet_config.insert("failSwapOn".to_owned(), Value::Bool(false));
-        let mut memory_swap = Mapping::new();
-        memory_swap.insert(
-            Value::String("swapBehavior".to_owned()),
-            Value::String("LimitedSwap".to_owned()),
-        );
-        kubelet_config.insert("memorySwap".to_owned(), Value::Mapping(memory_swap));
+    // Enable swap.
+    kubelet_config.insert("failSwapOn".to_owned(), Value::Bool(false));
+    let mut memory_swap = Mapping::new();
+    memory_swap.insert(
+        Value::String("swapBehavior".to_owned()),
+        Value::String("LimitedSwap".to_owned()),
+    );
+    kubelet_config.insert("memorySwap".to_owned(), Value::Mapping(memory_swap));
 
-        // Write the updates.
-        fs::write(path, serde_yaml::to_string(&kubelet_config).unwrap()).unwrap();
-    }
+    // Write the updates.
+    fs::write(path, serde_yaml::to_string(&kubelet_config).unwrap()).unwrap();
 }
