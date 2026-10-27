@@ -1,7 +1,6 @@
 use std::collections::BTreeMap;
 use std::fs;
 use std::io::ErrorKind;
-use std::path::Path;
 
 use serde_yaml::{Mapping, Value};
 use tracing::info;
@@ -61,7 +60,16 @@ impl<D: DiskDetectorTrait> SwapController<D> {
                     update_kubelet_config("/host/home/kubernetes/kubelet-config.yaml");
                 }
                 CloudProvider::Azure => {
-                    match existing_kubelet_config_file(AZURE_KUBELET_DROPIN_DIR) {
+                    let environment = self.commander.check_output(&[
+                        "chroot",
+                        "/host",
+                        "systemctl",
+                        "show",
+                        "kubelet.service",
+                        "-p",
+                        "Environment",
+                    ]);
+                    match kubelet_config_file(&String::from_utf8(environment.stdout).unwrap()) {
                         // Node Auto Provisioning nodes already configure the kubelet
                         // with a config file, so update it rather than replacing it.
                         Some(path) => update_kubelet_config(&format!("/host{path}")),
@@ -175,30 +183,30 @@ fn update_kubelet_config(path: &str) {
     fs::write(path, data).unwrap();
 }
 
-/// Returns the kubelet config file a systemd drop-in in `dir` passes with
-/// `KUBELET_CONFIG_FILE_FLAGS=--config <path>`. Drop-ins apply in lexical
-/// order, so the last one wins.
-fn existing_kubelet_config_file(dir: &str) -> Option<String> {
-    let mut entries: Vec<_> = match fs::read_dir(dir) {
-        Ok(entries) => entries.map(|e| e.unwrap().path()).collect(),
-        Err(e) if e.kind() == ErrorKind::NotFound => return None,
-        Err(e) => panic!("failed to read {dir}: {e:?}"),
-    };
-    entries.sort();
-    entries
+/// Returns the kubelet config file passed with
+/// `KUBELET_CONFIG_FILE_FLAGS=--config <path>`, given the output of
+/// `systemctl show -p Environment`. systemd has already merged the drop-ins,
+/// and quotes assignments containing spaces, e.g. `Environment="A=b c" D=e`.
+fn kubelet_config_file(environment: &str) -> Option<String> {
+    let words = environment
+        .trim()
+        .strip_prefix("Environment=")
+        .and_then(shlex::split)
+        .unwrap_or_else(|| panic!("unexpected systemctl show output: {environment:?}"));
+    let value = words
         .iter()
-        .filter_map(|p| config_flag_path(p))
-        .next_back()
+        .filter_map(|word| word.strip_prefix("KUBELET_CONFIG_FILE_FLAGS="))
+        .next_back()?;
+    config_flag_path(value)
 }
 
 /// Finds `--config <path>` or `--config=<path>` among the flags. systemd splits
 /// the variable on whitespace when expanding it, so we do too, and the kubelet
 /// takes the last `--config`, so we do too. Panics on a non-empty value without
-/// a `--config` path: falling back to our own drop-in would replace those flags.
-fn config_flag_path(dropin: &Path) -> Option<String> {
-    let content = fs::read_to_string(dropin).ok()?;
-    let (_, rest) = content.split_once("KUBELET_CONFIG_FILE_FLAGS=")?;
-    let value = rest.split(['"', '\n']).next().unwrap().trim();
+/// an absolute `--config` path: falling back to our own drop-in would replace
+/// those flags.
+fn config_flag_path(value: &str) -> Option<String> {
+    let value = value.trim();
     if value.is_empty() {
         return None;
     }
@@ -216,11 +224,12 @@ fn config_flag_path(dropin: &Path) -> Option<String> {
         }
     }
     let Some(path) = config else {
-        panic!(
-            "no --config path in KUBELET_CONFIG_FILE_FLAGS in {}: {value:?}",
-            dropin.display()
-        );
+        panic!("no --config path in KUBELET_CONFIG_FILE_FLAGS: {value:?}");
     };
+    assert!(
+        path.starts_with('/'),
+        "relative --config path in KUBELET_CONFIG_FILE_FLAGS: {path:?}"
+    );
     Some(path.to_owned())
 }
 
@@ -228,92 +237,61 @@ fn config_flag_path(dropin: &Path) -> Option<String> {
 mod tests {
     use super::*;
 
-    fn write_dropins(files: &[(&str, &str)]) -> tempfile::TempDir {
-        let dir = tempfile::tempdir().unwrap();
-        for (name, content) in files {
-            fs::write(dir.path().join(name), content).unwrap();
-        }
-        dir
-    }
-
     #[test]
-    fn test_existing_kubelet_config_file_nap() {
-        let dir = write_dropins(&[
-            (
-                "10-cgroupv2.conf",
-                "[Service]\nEnvironment=\"KUBELET_CGROUP_FLAGS=--cgroup-driver=systemd\"\n",
-            ),
-            (
-                "10-componentconfig.conf",
-                "[Service]\nEnvironment=\"KUBELET_CONFIG_FILE_FLAGS=--config /etc/default/kubeletconfig.json\"\n",
-            ),
-        ]);
+    fn test_kubelet_config_file_nap() {
         assert_eq!(
-            existing_kubelet_config_file(dir.path().to_str().unwrap()),
+            kubelet_config_file(
+                "Environment=KUBELET_CGROUP_FLAGS=--cgroup-driver=systemd \"KUBELET_CONFIG_FILE_FLAGS=--config /etc/default/kubeletconfig.json\" \"KUBELET_FLAGS=--v=2 --node-ip=10.0.0.1\"\n"
+            ),
             Some("/etc/default/kubeletconfig.json".to_owned()),
         );
     }
 
     #[test]
-    fn test_existing_kubelet_config_file_vmss() {
-        let dir = write_dropins(&[(
-            "10-containerd-base-flag.conf",
-            "[Service]\nEnvironment=\"KUBELET_CONTAINERD_FLAGS=--runtime-request-timeout=15m\"\n",
-        )]);
-        assert_eq!(
-            existing_kubelet_config_file(dir.path().to_str().unwrap()),
-            None
-        );
-        assert_eq!(existing_kubelet_config_file("/nonexistent"), None);
-
-        let dir = write_dropins(&[(
-            "10-componentconfig.conf",
-            "[Service]\nEnvironment=\"KUBELET_CONFIG_FILE_FLAGS=\"\n",
-        )]);
-        assert_eq!(
-            existing_kubelet_config_file(dir.path().to_str().unwrap()),
-            None
-        );
+    fn test_kubelet_config_file_vmss() {
+        for environment in [
+            "Environment=\n",
+            "Environment=KUBELET_CONTAINERD_FLAGS=--runtime-request-timeout=15m\n",
+            "Environment=KUBELET_CONFIG_FILE_FLAGS= \"KUBELET_FLAGS=--v=2 --node-ip=10.0.0.1\"\n",
+        ] {
+            assert_eq!(kubelet_config_file(environment), None, "{environment}");
+        }
     }
 
     #[test]
-    fn test_existing_kubelet_config_file_flag_forms() {
-        for flags in [
-            "--config=/etc/default/kubeletconfig.json",
-            "--v=2 --config /etc/default/kubeletconfig.json",
-            "--v=2  --config=/etc/default/kubeletconfig.json --foo bar",
-            "--config /etc/kubelet.yaml --config /etc/default/kubeletconfig.json",
+    fn test_kubelet_config_file_flag_forms() {
+        for environment in [
+            "Environment=KUBELET_CONFIG_FILE_FLAGS=--config=/etc/default/kubeletconfig.json",
+            "Environment=\"KUBELET_CONFIG_FILE_FLAGS=--v=2 --config /etc/default/kubeletconfig.json\"",
+            "Environment=\"KUBELET_CONFIG_FILE_FLAGS=--v=2  --config=/etc/default/kubeletconfig.json --foo bar\"",
+            "Environment=\"KUBELET_CONFIG_FILE_FLAGS=--config /etc/kubelet.yaml --config /etc/default/kubeletconfig.json\"",
         ] {
-            let dir = write_dropins(&[(
-                "10-componentconfig.conf",
-                &format!("[Service]\nEnvironment=\"KUBELET_CONFIG_FILE_FLAGS={flags}\"\n"),
-            )]);
             assert_eq!(
-                existing_kubelet_config_file(dir.path().to_str().unwrap()),
+                kubelet_config_file(environment),
                 Some("/etc/default/kubeletconfig.json".to_owned()),
-                "{flags}",
+                "{environment}",
             );
         }
     }
 
     #[test]
     #[should_panic(expected = "no --config path in KUBELET_CONFIG_FILE_FLAGS")]
-    fn test_existing_kubelet_config_file_without_config() {
-        let dir = write_dropins(&[(
-            "10-componentconfig.conf",
-            "[Service]\nEnvironment=\"KUBELET_CONFIG_FILE_FLAGS=--v=2\"\n",
-        )]);
-        existing_kubelet_config_file(dir.path().to_str().unwrap());
+    fn test_kubelet_config_file_without_config() {
+        kubelet_config_file("Environment=KUBELET_CONFIG_FILE_FLAGS=--v=2");
     }
 
     #[test]
     #[should_panic(expected = "no --config path in KUBELET_CONFIG_FILE_FLAGS")]
-    fn test_existing_kubelet_config_file_config_without_path() {
-        let dir = write_dropins(&[(
-            "10-componentconfig.conf",
-            "[Service]\nEnvironment=\"KUBELET_CONFIG_FILE_FLAGS=--v=2 --config\"\n",
-        )]);
-        existing_kubelet_config_file(dir.path().to_str().unwrap());
+    fn test_kubelet_config_file_config_without_path() {
+        kubelet_config_file("Environment=\"KUBELET_CONFIG_FILE_FLAGS=--v=2 --config\"");
+    }
+
+    #[test]
+    #[should_panic(expected = "relative --config path in KUBELET_CONFIG_FILE_FLAGS")]
+    fn test_kubelet_config_file_relative_config() {
+        kubelet_config_file(
+            "Environment=\"KUBELET_CONFIG_FILE_FLAGS=--config kubeletconfig.json\"",
+        );
     }
 
     #[test]
