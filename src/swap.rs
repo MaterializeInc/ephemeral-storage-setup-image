@@ -9,6 +9,8 @@ use crate::detect::DiskDetectorTrait;
 use crate::remove_taint::remove_taint;
 use crate::{CloudProvider, Commander};
 
+const AZURE_KUBELET_DROPIN_DIR: &str = "/host/etc/systemd/system/kubelet.service.d";
+
 pub struct SwapController<D: DiskDetectorTrait> {
     pub cloud_provider: CloudProvider,
     pub commander: Commander,
@@ -55,20 +57,36 @@ impl<D: DiskDetectorTrait> SwapController<D> {
             info!("Hackily enabling swap by modifying the Kubelet config and restarting it.");
             match self.cloud_provider {
                 CloudProvider::Gcp => {
-                    self.update_kubelet_config("/host/home/kubernetes/kubelet-config.yaml");
+                    update_kubelet_config("/host/home/kubernetes/kubelet-config.yaml");
                 }
                 CloudProvider::Azure => {
-                    // Azure doesn't use a kubelet config file by default,
-                    // and there isn't a command line flag to enable LimitedSwap.
-                    self.update_kubelet_config("/host/var/lib/kubelet/config.yaml");
-                    // Azure does reference an env var for the kubelet config file args,
-                    // but it isn't set initially.
-                    fs::write(
-                        "/host/etc/systemd/system/kubelet.service.d/99-enable-swap.conf",
-                        r#"[Service]
+                    let environment = self.commander.check_output(&[
+                        "chroot",
+                        "/host",
+                        "systemctl",
+                        "show",
+                        "kubelet.service",
+                        "-p",
+                        "Environment",
+                    ]);
+                    match kubelet_config_file(&String::from_utf8(environment.stdout).unwrap()) {
+                        // Node Auto Provisioning nodes already configure the kubelet
+                        // with a config file, so update it rather than replacing it.
+                        Some(path) => update_kubelet_config(&format!("/host{path}")),
+                        // VMSS node pools don't use a kubelet config file, and
+                        // there isn't a command line flag to enable LimitedSwap.
+                        // They reference an env var for the kubelet config file
+                        // args, but it isn't set initially.
+                        None => {
+                            update_kubelet_config("/host/var/lib/kubelet/config.yaml");
+                            fs::write(
+                                format!("{AZURE_KUBELET_DROPIN_DIR}/99-enable-swap.conf"),
+                                r#"[Service]
 Environment="KUBELET_CONFIG_FILE_FLAGS=--config /var/lib/kubelet/config.yaml""#,
-                    )
-                    .unwrap();
+                            )
+                            .unwrap();
+                        }
+                    }
                 }
                 _ => panic!(
                     "Hack enabling swap by restarting the kubelet is not supported for cloud provider: {:?}",
@@ -129,33 +147,171 @@ Environment="KUBELET_CONFIG_FILE_FLAGS=--config /var/lib/kubelet/config.yaml""#,
         self.commander
             .check_output(&["sysctl", &format!("{key}={value}")]);
     }
+}
 
-    fn update_kubelet_config(&self, path: &str) {
-        // Read existing configuration, if any.
-        let mut kubelet_config: BTreeMap<String, Value> = match fs::read(path) {
-            Ok(data) => serde_yaml::from_slice(&data).unwrap(),
-            Err(e) if e.kind() == ErrorKind::NotFound => BTreeMap::new(),
-            Err(e) => panic!("failed to read kubelet config {path}: {e:?}"),
+fn update_kubelet_config(path: &str) {
+    // Read existing configuration, if any.
+    let mut kubelet_config: BTreeMap<String, Value> = match fs::read(path) {
+        Ok(data) => serde_yaml::from_slice(&data).unwrap(),
+        Err(e) if e.kind() == ErrorKind::NotFound => BTreeMap::new(),
+        Err(e) => panic!("failed to read kubelet config {path}: {e:?}"),
+    };
+
+    // Ensure we have the type information, in case we're making a new file.
+    kubelet_config
+        .entry("kind".to_owned())
+        .or_insert(Value::String("KubeletConfiguration".to_owned()));
+    kubelet_config
+        .entry("apiVersion".to_owned())
+        .or_insert(Value::String("kubelet.config.k8s.io/v1beta1".to_owned()));
+
+    // Enable swap.
+    kubelet_config.insert("failSwapOn".to_owned(), Value::Bool(false));
+    let mut memory_swap = Mapping::new();
+    memory_swap.insert(
+        Value::String("swapBehavior".to_owned()),
+        Value::String("LimitedSwap".to_owned()),
+    );
+    kubelet_config.insert("memorySwap".to_owned(), Value::Mapping(memory_swap));
+
+    // Write the updates, keeping a JSON file JSON.
+    let data = if path.ends_with(".json") {
+        serde_json::to_string_pretty(&kubelet_config).unwrap()
+    } else {
+        serde_yaml::to_string(&kubelet_config).unwrap()
+    };
+    fs::write(path, data).unwrap();
+}
+
+/// Returns the kubelet config file passed with
+/// `KUBELET_CONFIG_FILE_FLAGS=--config <path>`, given the output of
+/// `systemctl show -p Environment`. systemd has already merged the drop-ins,
+/// and quotes assignments containing spaces, e.g. `Environment="A=b c" D=e`.
+fn kubelet_config_file(environment: &str) -> Option<String> {
+    let words = environment
+        .trim()
+        .strip_prefix("Environment=")
+        .and_then(shlex::split)
+        .unwrap_or_else(|| panic!("unexpected systemctl show output: {environment:?}"));
+    let value = words
+        .iter()
+        .filter_map(|word| word.strip_prefix("KUBELET_CONFIG_FILE_FLAGS="))
+        .next_back()?;
+    config_flag_path(value)
+}
+
+/// Finds `--config <path>` or `--config=<path>` among the flags. systemd splits
+/// the variable on whitespace when expanding it, so we do too, and the kubelet
+/// takes the last `--config`, so we do too. Panics on a non-empty value without
+/// an absolute `--config` path: falling back to our own drop-in would replace
+/// those flags.
+fn config_flag_path(value: &str) -> Option<String> {
+    let value = value.trim();
+    if value.is_empty() {
+        return None;
+    }
+    let mut config = None;
+    let mut args = value.split_whitespace();
+    while let Some(arg) = args.next() {
+        let path = match arg.strip_prefix("--config=") {
+            Some(path) => Some(path),
+            None if arg == "--config" => args.next(),
+            None => continue,
         };
+        config = path.filter(|p| !p.is_empty());
+        if config.is_none() {
+            break;
+        }
+    }
+    let Some(path) = config else {
+        panic!("no --config path in KUBELET_CONFIG_FILE_FLAGS: {value:?}");
+    };
+    assert!(
+        path.starts_with('/'),
+        "relative --config path in KUBELET_CONFIG_FILE_FLAGS: {path:?}"
+    );
+    Some(path.to_owned())
+}
 
-        // Ensure we have the type information, in case we're making a new file.
-        kubelet_config
-            .entry("kind".to_owned())
-            .or_insert(Value::String("KubeletConfiguration".to_owned()));
-        kubelet_config
-            .entry("apiVersion".to_owned())
-            .or_insert(Value::String("kubelet.config.k8s.io/v1beta1".to_owned()));
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-        // Enable swap.
-        kubelet_config.insert("failSwapOn".to_owned(), Value::Bool(false));
-        let mut memory_swap = Mapping::new();
-        memory_swap.insert(
-            Value::String("swapBehavior".to_owned()),
-            Value::String("LimitedSwap".to_owned()),
+    #[test]
+    fn test_kubelet_config_file_nap() {
+        assert_eq!(
+            kubelet_config_file(
+                "Environment=KUBELET_CGROUP_FLAGS=--cgroup-driver=systemd \"KUBELET_CONFIG_FILE_FLAGS=--config /etc/default/kubeletconfig.json\" \"KUBELET_FLAGS=--v=2 --node-ip=10.0.0.1\"\n"
+            ),
+            Some("/etc/default/kubeletconfig.json".to_owned()),
         );
-        kubelet_config.insert("memorySwap".to_owned(), Value::Mapping(memory_swap));
+    }
 
-        // Write the updates.
-        fs::write(path, serde_yaml::to_string(&kubelet_config).unwrap()).unwrap();
+    #[test]
+    fn test_kubelet_config_file_vmss() {
+        for environment in [
+            "Environment=\n",
+            "Environment=KUBELET_CONTAINERD_FLAGS=--runtime-request-timeout=15m\n",
+            "Environment=KUBELET_CONFIG_FILE_FLAGS= \"KUBELET_FLAGS=--v=2 --node-ip=10.0.0.1\"\n",
+        ] {
+            assert_eq!(kubelet_config_file(environment), None, "{environment}");
+        }
+    }
+
+    #[test]
+    fn test_kubelet_config_file_flag_forms() {
+        for environment in [
+            "Environment=KUBELET_CONFIG_FILE_FLAGS=--config=/etc/default/kubeletconfig.json",
+            "Environment=\"KUBELET_CONFIG_FILE_FLAGS=--v=2 --config /etc/default/kubeletconfig.json\"",
+            "Environment=\"KUBELET_CONFIG_FILE_FLAGS=--v=2  --config=/etc/default/kubeletconfig.json --foo bar\"",
+            "Environment=\"KUBELET_CONFIG_FILE_FLAGS=--config /etc/kubelet.yaml --config /etc/default/kubeletconfig.json\"",
+        ] {
+            assert_eq!(
+                kubelet_config_file(environment),
+                Some("/etc/default/kubeletconfig.json".to_owned()),
+                "{environment}",
+            );
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "no --config path in KUBELET_CONFIG_FILE_FLAGS")]
+    fn test_kubelet_config_file_without_config() {
+        kubelet_config_file("Environment=KUBELET_CONFIG_FILE_FLAGS=--v=2");
+    }
+
+    #[test]
+    #[should_panic(expected = "no --config path in KUBELET_CONFIG_FILE_FLAGS")]
+    fn test_kubelet_config_file_config_without_path() {
+        kubelet_config_file("Environment=\"KUBELET_CONFIG_FILE_FLAGS=--v=2 --config\"");
+    }
+
+    #[test]
+    #[should_panic(expected = "relative --config path in KUBELET_CONFIG_FILE_FLAGS")]
+    fn test_kubelet_config_file_relative_config() {
+        kubelet_config_file(
+            "Environment=\"KUBELET_CONFIG_FILE_FLAGS=--config kubeletconfig.json\"",
+        );
+    }
+
+    #[test]
+    fn test_update_kubelet_config_keeps_existing_json() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("kubeletconfig.json");
+        let path = path.to_str().unwrap();
+        fs::write(
+            path,
+            r#"{"kind":"KubeletConfiguration","apiVersion":"kubelet.config.k8s.io/v1beta1","clusterDNS":["10.1.0.10"],"authentication":{"webhook":{"enabled":true}},"failSwapOn":true}"#,
+        )
+        .unwrap();
+
+        update_kubelet_config(path);
+
+        let config: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(path).unwrap()).unwrap();
+        assert_eq!(config["clusterDNS"], serde_json::json!(["10.1.0.10"]));
+        assert_eq!(config["authentication"]["webhook"]["enabled"], true);
+        assert_eq!(config["failSwapOn"], false);
+        assert_eq!(config["memorySwap"]["swapBehavior"], "LimitedSwap");
     }
 }
