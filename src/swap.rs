@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::io::ErrorKind;
 
-use serde_yaml::{Mapping, Value};
+use serde_json::{Map, Value};
 use tracing::info;
 
 use crate::detect::DiskDetectorTrait;
@@ -152,7 +152,7 @@ Environment="KUBELET_CONFIG_FILE_FLAGS=--config /var/lib/kubelet/config.yaml""#,
 fn update_kubelet_config(path: &str) {
     // Read existing configuration, if any.
     let mut kubelet_config: BTreeMap<String, Value> = match fs::read(path) {
-        Ok(data) => serde_yaml::from_slice(&data).unwrap(),
+        Ok(data) => serde_saphyr::from_slice(&data).unwrap(),
         Err(e) if e.kind() == ErrorKind::NotFound => BTreeMap::new(),
         Err(e) => panic!("failed to read kubelet config {path}: {e:?}"),
     };
@@ -167,18 +167,18 @@ fn update_kubelet_config(path: &str) {
 
     // Enable swap.
     kubelet_config.insert("failSwapOn".to_owned(), Value::Bool(false));
-    let mut memory_swap = Mapping::new();
+    let mut memory_swap = Map::new();
     memory_swap.insert(
-        Value::String("swapBehavior".to_owned()),
+        "swapBehavior".to_owned(),
         Value::String("LimitedSwap".to_owned()),
     );
-    kubelet_config.insert("memorySwap".to_owned(), Value::Mapping(memory_swap));
+    kubelet_config.insert("memorySwap".to_owned(), Value::Object(memory_swap));
 
     // Write the updates, keeping a JSON file JSON.
     let data = if path.ends_with(".json") {
         serde_json::to_string_pretty(&kubelet_config).unwrap()
     } else {
-        serde_yaml::to_string(&kubelet_config).unwrap()
+        serde_saphyr::to_string(&kubelet_config).unwrap()
     };
     fs::write(path, data).unwrap();
 }
