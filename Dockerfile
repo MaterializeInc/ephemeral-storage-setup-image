@@ -30,7 +30,7 @@ RUN xx-cargo build --release && \
     xx-verify --static ./ephemeral-storage-setup
 
 
-FROM alpine:3.23 AS final
+FROM alpine:3.24 AS final
 
 RUN apk add --no-cache \
     lvm2 \
