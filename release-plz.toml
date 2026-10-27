@@ -1,0 +1,3 @@
+[workspace]
+# The crate is not published to crates.io, so versions come from git tags.
+git_only = true

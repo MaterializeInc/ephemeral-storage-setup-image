@@ -117,8 +117,7 @@ Write commit messages in present tense, imperative mood, and reference any relat
 
 - Update `README.md` with any new features or changes
 - Document script parameters and include helpful code comments
-- For releases, create a tag following semantic versioning (`git tag -a v0.2.0 -m v0.2.0`) and push the tag to the repository
-- GitHub Actions will automatically build and publish Docker images from tags
+- Releases are managed by [release-plz](https://release-plz.dev): merging the release PR it opens tags the release and publishes the Docker image
 
 ## Getting Help
 
