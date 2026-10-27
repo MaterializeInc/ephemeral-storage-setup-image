@@ -16,15 +16,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.5.0](https://github.com/MaterializeInc/ephemeral-storage-setup-image/compare/v0.4.2...v0.5.0) - 2026-10-27
 
+### Added
+
+- Support for AKS Node Auto Provisioning nodes, by merging swap settings into the kubelet config file passed via `KUBELET_CONFIG_FILE_FLAGS`.
+
 ### Changed
 
 - Replace `serde_yaml` with `serde-saphyr`.
 - Update the Rust toolchain image to 1.99.1 and other Rust dependencies.
 - Release with release-plz.
-
-### Fixed
-
-- On Azure, merge swap settings into the kubelet config file passed via `KUBELET_CONFIG_FILE_FLAGS` instead of overwriting it. This fixes AKS Node Auto Provisioning nodes losing their kubelet authentication and cluster DNS settings.
 
 ### Security
 
