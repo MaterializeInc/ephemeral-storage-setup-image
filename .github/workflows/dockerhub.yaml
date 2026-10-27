@@ -1,8 +1,11 @@
 name: Publish Docker image
 
 on:
-  push:
-    tags: ["v*"]
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
 
 jobs:
   push_to_registry:
@@ -11,6 +14,8 @@ jobs:
     steps:
       - name: Check out the repo
         uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.tag }}
 
       - name: Use QEMU for people who are into that
         uses: docker/setup-qemu-action@v3
@@ -29,7 +34,7 @@ jobs:
         with:
           images: materialize/ephemeral-storage-setup-image
           tags: |
-            type=semver,pattern=v{{version}}
+            type=semver,pattern=v{{version}},value=${{ inputs.tag }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
