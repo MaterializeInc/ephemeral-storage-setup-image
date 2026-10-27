@@ -48,6 +48,8 @@ Stderr:
         // We still check if we can even spawn the process,
         // we just don't check the return code.
         let failure_msg = format!("Failed to spawn '{args:?}'");
+        #[cfg(test)]
+        let _guard = test::SPAWN_LOCK.read().unwrap();
         Command::new(args[0])
             .args(&args[1..])
             .envs(&self.envs)
@@ -72,10 +74,15 @@ mod test {
     use std::io::Write;
     use std::os::unix::fs::OpenOptionsExt;
     use std::path::PathBuf;
+    use std::sync::RwLock;
 
     use tempfile::TempDir;
 
     use crate::Commander;
+
+    /// Prevents spawning while a mock is open for writing. Otherwise a concurrently
+    /// forked child can inherit the writable fd, causing ETXTBSY when the mock is exec'd.
+    pub(crate) static SPAWN_LOCK: RwLock<()> = RwLock::new(());
 
     pub(crate) struct TestEnv {
         pub(crate) temp_dir: TempDir,
@@ -99,6 +106,7 @@ mod test {
         }
 
         pub(crate) fn mock(&self, command: &str, exit_code: u8, output: &str) {
+            let _guard = SPAWN_LOCK.write().unwrap();
             let mut file = OpenOptions::new()
                 .write(true)
                 .truncate(true)
