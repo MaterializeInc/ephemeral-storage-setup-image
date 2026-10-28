@@ -1,15 +1,19 @@
 use std::collections::BTreeMap;
 use std::fs;
-use std::io::ErrorKind;
+use std::io::{ErrorKind, Read, Write};
+use std::net::{SocketAddr, TcpStream};
+use std::thread::sleep;
+use std::time::{Duration, Instant};
 
 use serde_json::{Map, Value};
-use tracing::info;
+use tracing::{debug, info};
 
 use crate::detect::DiskDetectorTrait;
 use crate::remove_taint::remove_taint;
 use crate::{CloudProvider, Commander};
 
 const AZURE_KUBELET_DROPIN_DIR: &str = "/host/etc/systemd/system/kubelet.service.d";
+const KUBELET_HEALTHY_TIMEOUT: Duration = Duration::from_secs(300);
 
 pub struct SwapController<D: DiskDetectorTrait> {
     pub cloud_provider: CloudProvider,
@@ -19,6 +23,7 @@ pub struct SwapController<D: DiskDetectorTrait> {
     pub taint_key: String,
     pub bottlerocket_enable_swap: bool,
     pub hack_restart_kubelet_enable_swap: bool,
+    pub kubelet_healthz_addr: SocketAddr,
     pub remove_taint: bool,
     pub apply_sysctls: bool,
     pub vm_swappiness: usize,
@@ -104,6 +109,10 @@ Environment="KUBELET_CONFIG_FILE_FLAGS=--config /var/lib/kubelet/config.yaml""#,
                 "restart",
                 "kubelet.service",
             ]);
+
+            // systemctl returns once the kubelet has started, not once it's
+            // healthy. Don't let pods onto the node if it never recovers.
+            wait_for_kubelet_healthy(self.kubelet_healthz_addr, KUBELET_HEALTHY_TIMEOUT);
         }
 
         info!("Swap setup completed successfully");
@@ -183,6 +192,42 @@ fn update_kubelet_config(path: &str) {
     fs::write(path, data).unwrap();
 }
 
+/// Waits until the kubelet's healthz endpoint at `addr` returns `ok`.
+/// Panics if it doesn't within `timeout`.
+fn wait_for_kubelet_healthy(addr: SocketAddr, timeout: Duration) {
+    info!("Waiting for the kubelet to be healthy");
+    let start = Instant::now();
+    loop {
+        match kubelet_healthz(addr) {
+            Ok(true) => {
+                info!("Kubelet is healthy");
+                return;
+            }
+            Ok(false) => debug!("Kubelet isn't healthy yet"),
+            Err(e) => debug!("Kubelet healthz isn't reachable yet: {e}"),
+        }
+        assert!(
+            start.elapsed() < timeout,
+            "kubelet wasn't healthy at {addr} after {timeout:?}"
+        );
+        sleep(Duration::from_secs(1));
+    }
+}
+
+/// Returns whether `GET /healthz` at `addr` returns 200 with the body `ok`.
+fn kubelet_healthz(addr: SocketAddr) -> std::io::Result<bool> {
+    let mut stream = TcpStream::connect_timeout(&addr, Duration::from_secs(5))?;
+    stream.set_read_timeout(Some(Duration::from_secs(5)))?;
+    // HTTP/1.0, so the server closes the connection after responding.
+    stream.write_all(b"GET /healthz HTTP/1.0\r\nHost: localhost\r\n\r\n")?;
+    let mut response = String::new();
+    stream.read_to_string(&mut response)?;
+    let Some((head, body)) = response.split_once("\r\n\r\n") else {
+        return Ok(false);
+    };
+    Ok(head.split_whitespace().nth(1) == Some("200") && body == "ok")
+}
+
 /// Returns the kubelet config file passed with
 /// `KUBELET_CONFIG_FILE_FLAGS=--config <path>`, given the output of
 /// `systemctl show -p Environment`. systemd has already merged the drop-ins,
@@ -235,7 +280,53 @@ fn config_flag_path(value: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
+    use std::net::TcpListener;
+
     use super::*;
+
+    /// Serves one healthz response per connection, in order.
+    fn serve_healthz(responses: &'static [(&'static str, &'static str)]) -> SocketAddr {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        std::thread::spawn(move || {
+            for (status, body) in responses {
+                let (mut stream, _) = listener.accept().unwrap();
+                let mut request = Vec::new();
+                let mut buf = [0; 1024];
+                while !request.ends_with(b"\r\n\r\n") {
+                    let n = stream.read(&mut buf).unwrap();
+                    request.extend_from_slice(&buf[..n]);
+                }
+                write!(
+                    stream,
+                    "HTTP/1.0 {status}\r\nContent-Length: {}\r\n\r\n{body}",
+                    body.len()
+                )
+                .unwrap();
+            }
+        });
+        addr
+    }
+
+    #[test]
+    fn test_wait_for_kubelet_healthy() {
+        let addr = serve_healthz(&[
+            ("500 Internal Server Error", "[-]syncloop failed"),
+            ("200 OK", "ok"),
+        ]);
+        wait_for_kubelet_healthy(addr, Duration::from_secs(10));
+    }
+
+    #[test]
+    #[should_panic(expected = "kubelet wasn't healthy")]
+    fn test_wait_for_kubelet_healthy_timeout() {
+        // Nothing listens on a port once its listener is dropped.
+        let addr = TcpListener::bind("127.0.0.1:0")
+            .unwrap()
+            .local_addr()
+            .unwrap();
+        wait_for_kubelet_healthy(addr, Duration::from_secs(2));
+    }
 
     #[test]
     fn test_kubelet_config_file_nap() {
