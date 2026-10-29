@@ -3,5 +3,19 @@
   "extends": [
     "config:recommended",
     "helpers:pinGitHubActionDigests"
+  ],
+  "packageRules": [
+    {
+      "matchManagers": ["cargo"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "matchCurrentVersion": "!/^0\\./",
+      "groupName": "rust dependencies (non-major)"
+    },
+    {
+      "matchManagers": ["cargo"],
+      "matchPackageNames": ["kube", "k8s-openapi"],
+      "groupName": "kube",
+      "separateMajorMinor": false
+    }
   ]
 }
