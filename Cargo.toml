@@ -5,6 +5,17 @@ edition = "2024"
 rust-version = "1.89.0"
 resolver = "2"
 publish = false
+# Otherwise Cargo auto-includes README.md despite `include`.
+readme = false
+# Only changes to files that go into the Docker image trigger a release-plz
+# release.
+include = [
+    "/src/",
+    "/Cargo.toml",
+    "/Cargo.lock",
+    "/lvm.conf",
+    "/Dockerfile",
+]
 
 [[bin]]
 name = "ephemeral-storage-setup"
