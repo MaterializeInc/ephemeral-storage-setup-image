@@ -4,45 +4,47 @@ Thank you for your interest in contributing! This guide will help you understand
 
 ## Project Overview
 
-Bootstrap LVM configures local instance store volumes on cloud instances and runs as a Kubernetes DaemonSet. It detects NVMe devices across different cloud providers (AWS, GCP, Azure), sets up LVM volume groups, and removes node taints to enable workload scheduling.
+`ephemeral-storage-setup` is a Rust binary that configures local instance store volumes on cloud instances and runs as a Kubernetes DaemonSet. It detects NVMe devices across different cloud providers (AWS, GCP, Azure), sets them up as either an LVM volume group or swap, and removes node taints to enable workload scheduling.
 
 ## Development Setup
 
 ### Prerequisites
 
-- Git, Docker, Bash
-- [Bats](https://bats-core.readthedocs.io/en/stable/installation.html) for testing
-- [ShellCheck](https://github.com/koalaman/shellcheck) for shell script linting
-- [pre-commit](https://pre-commit.com/) for automated checks
+- Git, Docker
+- A [Rust toolchain](https://rustup.rs/)
+- [pre-commit](https://pre-commit.com/) and [cargo-deny](https://github.com/EmbarkStudios/cargo-deny) for linting
 
 ### Getting Started
 
 1. Fork and clone the repository
-2. Install pre-commit hooks: `pip install pre-commit && pre-commit install`
+2. Install the pre-push hooks: `pip install -r requirements.txt && pre-commit install`
 
 ### Key Files
 
-- `remove-taint.sh` - Script to remove Kubernetes node taints
-- `tests/` - Test suite using Bats framework
+- `src/` - The `ephemeral-storage-setup` binary (`lvm`, `swap`, and `sleep` subcommands)
+- `lvm.conf` - LVM configuration installed in the image
+- `testdata/` - `lsblk` output fixtures used by the unit tests
+- `examples/` - Example node configurations for each cloud provider
 - `Dockerfile` - Container image definition
 
 ## Testing
 
-We use the Bats (Bash Automated Testing System) framework for testing shell scripts.
-
-### Running Tests
+CI runs the unit tests, linting, and a Docker build on every PR. To run them locally:
 
 ```bash
-# Run all tests
-./tests/run-tests.sh
+# Unit tests
+cargo test
+
+# rustfmt, clippy, and cargo-deny
+./bin/lint
 ```
 
 ### Writing Tests
 
 When adding new features or fixing bugs, please include tests that:
 - Test both success and failure scenarios
-- Use the provided `test_helpers.sh` functions for creating mocks
-- Don't require root privileges when possible
+- Use `lsblk` fixtures in `testdata/` rather than real devices
+- Don't require root privileges
 
 ## Manual Testing
 
@@ -86,7 +88,6 @@ To thoroughly test your changes in a real environment, you should build a custom
 5. Check the logs of the DaemonSet pods to troubleshoot any issues:
    ```bash
    kubectl logs -n disk-setup disk-setup-pod-name -c disk-setup
-   kubectl logs -n disk-setup disk-setup-pod-name -c remove-taint
    kubectl describe pod disk-setup-pod-name -n disk-setup
    ```
 
@@ -104,15 +105,14 @@ Write commit messages in present tense, imperative mood, and reference any relat
 
 ## Coding Standards
 
-- Shell scripts should start with `#!/usr/bin/env bash` and use `set -euo pipefail`
-- Follow [Google's Shell Style Guide](https://google.github.io/styleguide/shellguide.html)
-- All scripts must pass ShellCheck linting
-- Use descriptive variable names, add comments for complex logic, and implement proper error handling
+- Code must be formatted with `rustfmt` and pass `clippy` with no warnings
+- New dependencies must pass `cargo-deny` checks (see `deny.toml`)
+- Use descriptive names, add comments for complex logic, and implement proper error handling
 
 ## Documentation and Releases
 
 - Update `README.md` with any new features or changes
-- Document script parameters and include helpful code comments
+- Document new CLI flags and include helpful code comments
 - Releases are managed by [release-plz](https://release-plz.dev): merging the release PR it opens tags the release and publishes the Docker image
 
 ## Getting Help
