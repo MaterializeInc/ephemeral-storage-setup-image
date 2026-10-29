@@ -1,4 +1,5 @@
 use std::io::ErrorKind;
+use std::net::SocketAddr;
 use std::process::exit;
 use std::thread::sleep;
 use std::time::Duration;
@@ -49,6 +50,11 @@ enum Commands {
         /// Enable swap by hackily modifying the kubelet config and restarting it.
         #[clap(long, env, group = "swap-hacks")]
         hack_restart_kubelet_enable_swap: bool,
+
+        /// Address of the kubelet's healthz endpoint, polled after restarting it.
+        /// Reaching the default address needs host networking.
+        #[arg(long, env, default_value = "127.0.0.1:10248")]
+        kubelet_healthz_addr: SocketAddr,
 
         /// Apply sysctl settings to make swap more effective and safer.
         ///
@@ -179,6 +185,7 @@ fn main() {
                 },
             bottlerocket_enable_swap,
             hack_restart_kubelet_enable_swap,
+            kubelet_healthz_addr,
             apply_sysctls,
             vm_swappiness,
             vm_min_free_kbytes,
@@ -199,6 +206,7 @@ fn main() {
                         remove_taint,
                         bottlerocket_enable_swap,
                         hack_restart_kubelet_enable_swap,
+                        kubelet_healthz_addr,
                         apply_sysctls,
                         vm_swappiness,
                         vm_min_free_kbytes,

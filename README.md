@@ -91,6 +91,8 @@ Options:
           Enable swap on bottlerocket nodes using its apiclient [env: BOTTLEROCKET_ENABLE_SWAP=]
       --hack-restart-kubelet-enable-swap
           Enable swap by hackily modifying the kubelet config and restarting it [env: HACK_RESTART_KUBELET_ENABLE_SWAP=]
+      --kubelet-healthz-addr <KUBELET_HEALTHZ_ADDR>
+          Address of the kubelet's healthz endpoint, polled after restarting it. Reaching the default address needs host networking [env: KUBELET_HEALTHZ_ADDR=] [default: 127.0.0.1:10248]
       --apply-sysctls
           Apply sysctl settings to make swap more effective and safer [env: APPLY_SYSCTLS=]
       --vm-swappiness <VM_SWAPPINESS>
