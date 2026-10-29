@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0](https://github.com/MaterializeInc/ephemeral-storage-setup-image/compare/v0.5.1...v0.6.0) - 2026-10-29
+
+### Added
+
+- [**breaking**] wait for the kubelet to be healthy after restarting it
+
+### Other
+
+- Update CONTRIBUTING.md for the Rust rewrite
+- Remove configure-disks.sh shim
+- Only trigger releases on changes to image inputs
+- Group renovate updates
+- Describe AKS Node Auto Provisioning support as a feature
+- Backfill CHANGELOG history and curate 0.5.x entries
+
 ## [0.5.1](https://github.com/MaterializeInc/ephemeral-storage-setup-image/compare/v0.5.0...v0.5.1) - 2026-10-27
 
 ### Changed
