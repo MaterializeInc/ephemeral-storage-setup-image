@@ -22,7 +22,6 @@ Bootstrap LVM configures local instance store volumes on cloud instances and run
 
 ### Key Files
 
-- `configure-disks.sh` - Main disk configuration script
 - `remove-taint.sh` - Script to remove Kubernetes node taints
 - `tests/` - Test suite using Bats framework
 - `Dockerfile` - Container image definition
@@ -36,9 +35,6 @@ We use the Bats (Bash Automated Testing System) framework for testing shell scri
 ```bash
 # Run all tests
 ./tests/run-tests.sh
-
-# Run specific test file
-bats tests/configure-disks.bats
 ```
 
 ### Writing Tests
