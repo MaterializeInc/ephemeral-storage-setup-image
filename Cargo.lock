@@ -271,7 +271,7 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-storage-setup"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "clap",
  "k8s-openapi",

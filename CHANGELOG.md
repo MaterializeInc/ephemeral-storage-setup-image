@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1](https://github.com/MaterializeInc/ephemeral-storage-setup-image/compare/v0.6.0...v0.6.1) - 2026-11-02
+
+### Other
+
+- Merge pull request #102 from MaterializeInc/renovate/openssl-0.x-lockfile
+- Update kube
+
 ## [0.6.0](https://github.com/MaterializeInc/ephemeral-storage-setup-image/compare/v0.5.1...v0.6.0) - 2026-10-29
 
 ### Added
