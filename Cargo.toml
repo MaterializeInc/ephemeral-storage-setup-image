@@ -2,8 +2,8 @@
 name = "ephemeral-storage-setup"
 version = "0.6.1"
 edition = "2024"
-rust-version = "1.89.0"
-resolver = "2"
+rust-version = "1.99.1"
+resolver = "3"
 publish = false
 # Otherwise Cargo auto-includes README.md despite `include`.
 readme = false

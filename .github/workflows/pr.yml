@@ -25,6 +25,10 @@ jobs:
           curl -Ls --fail https://github.com/EmbarkStudios/cargo-deny/releases/download/0.18.3/cargo-deny-0.18.3-x86_64-unknown-linux-musl.tar.gz
           | tar -xzC ~/.cargo/bin/ --strip-components 1 --no-anchored cargo-deny
 
+      # Install up front so the parallel pre-commit hooks don't race rustup's auto-install.
+      - name: Install Rust toolchain
+        run: rustup toolchain install
+
       - name: Run linting
         run: ./bin/lint
 
