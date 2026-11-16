@@ -9,7 +9,7 @@
 
 FROM --platform=$BUILDPLATFORM tonistiigi/xx:1.10.0 AS xx
 
-FROM --platform=$BUILDPLATFORM rust:1.99.1-alpine3.22 AS builder
+FROM --platform=$BUILDPLATFORM rust:1.100.0-alpine3.22 AS builder
 COPY --from=xx / /
 
 ARG BUILDARCH
