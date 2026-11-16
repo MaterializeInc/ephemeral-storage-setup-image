@@ -1,8 +1,14 @@
 use std::collections::HashMap;
+use std::io::ErrorKind;
+use std::os::unix::fs::PermissionsExt;
+use std::path::Path;
 use std::process::{Command, Output};
 use std::time::Duration;
 
 use clap::ValueEnum;
+use tracing::{info, warn};
+
+use crate::detect::BOTTLEROCKET_ROOTFS_PATH;
 
 pub mod detect;
 pub mod lvm;
@@ -58,6 +64,37 @@ Stderr:
     }
 }
 
+/// Bottlerocket runs bootstrap containers before the main containerd, and their
+/// shim creates /run/containerd as 0700. containerd keeps that mode instead of
+/// its usual 0711, which stops pods in user namespaces from reaching their rootfs.
+pub fn fix_bottlerocket_containerd_state_dir_mode() {
+    set_containerd_state_dir_mode(&Path::new(BOTTLEROCKET_ROOTFS_PATH).join("run/containerd"));
+}
+
+fn set_containerd_state_dir_mode(path: &Path) {
+    const REQUIRED_MODE: u32 = 0o711;
+    let current_mode = match std::fs::metadata(path) {
+        Ok(metadata) => metadata.permissions().mode() & 0o7777,
+        Err(e) if e.kind() == ErrorKind::NotFound => return,
+        Err(e) => {
+            warn!("Failed to stat {}: {e}", path.display());
+            return;
+        }
+    };
+    // Only add permissions, in case a later version grants more.
+    let new_mode = current_mode | REQUIRED_MODE;
+    if new_mode == current_mode {
+        return;
+    }
+    info!(
+        "Changing mode of {} from {current_mode:o} to {new_mode:o}",
+        path.display()
+    );
+    if let Err(e) = std::fs::set_permissions(path, std::fs::Permissions::from_mode(new_mode)) {
+        warn!("Failed to change mode of {}: {e}", path.display());
+    }
+}
+
 pub async fn load_kube_config() -> kube::Config {
     let mut config = kube::Config::incluster().unwrap();
 
@@ -79,6 +116,24 @@ mod test {
     use tempfile::TempDir;
 
     use crate::Commander;
+
+    #[test]
+    fn set_containerd_state_dir_mode() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let temp_dir = TempDir::with_prefix("ephemeral-storage-setup-test").unwrap();
+        let path = temp_dir.path().join("containerd");
+        // A missing directory is not an error.
+        super::set_containerd_state_dir_mode(&path);
+        std::fs::create_dir(&path).unwrap();
+        // (initial mode, expected mode): permissions are added, never removed.
+        for (initial_mode, expected_mode) in [(0o700, 0o711), (0o711, 0o711), (0o755, 0o755)] {
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(initial_mode)).unwrap();
+            super::set_containerd_state_dir_mode(&path);
+            let mode = std::fs::metadata(&path).unwrap().permissions().mode() & 0o7777;
+            assert_eq!(mode, expected_mode);
+        }
+    }
 
     /// Prevents spawning while a mock is open for writing. Otherwise a concurrently
     /// forked child can inherit the writable fd, causing ETXTBSY when the mock is exec'd.
