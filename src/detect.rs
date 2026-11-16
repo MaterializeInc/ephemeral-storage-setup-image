@@ -3,7 +3,7 @@ use tracing::{debug, info, trace};
 
 use crate::{CloudProvider, Commander};
 
-const BOTTLEROCKET_ROOTFS_PATH: &str = "/.bottlerocket/rootfs";
+pub(crate) const BOTTLEROCKET_ROOTFS_PATH: &str = "/.bottlerocket/rootfs";
 
 #[derive(Deserialize)]
 struct Lsblk {

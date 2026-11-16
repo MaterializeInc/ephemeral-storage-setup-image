@@ -9,7 +9,9 @@ use clap::{CommandFactory, Parser, Subcommand};
 use ephemeral_storage_setup::detect::DiskDetector;
 use ephemeral_storage_setup::lvm::LvmController;
 use ephemeral_storage_setup::swap::SwapController;
-use ephemeral_storage_setup::{CloudProvider, Commander};
+use ephemeral_storage_setup::{
+    CloudProvider, Commander, fix_bottlerocket_containerd_state_dir_mode,
+};
 use tracing::info;
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::EnvFilter;
@@ -158,6 +160,7 @@ fn main() {
                 },
             vg_name,
         } => {
+            fix_bottlerocket_containerd_state_dir_mode();
             let disk_detector = DiskDetector::new(commander.clone(), cloud_provider);
             tokio::runtime::Builder::new_current_thread()
                 .enable_all()
@@ -191,6 +194,7 @@ fn main() {
             vm_min_free_kbytes,
             vm_watermark_scale_factor,
         } => {
+            fix_bottlerocket_containerd_state_dir_mode();
             let disk_detector = DiskDetector::new(commander.clone(), cloud_provider);
             tokio::runtime::Builder::new_current_thread()
                 .enable_all()
